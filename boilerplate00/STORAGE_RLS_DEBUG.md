@@ -7,11 +7,13 @@ Clerk Third-Party Auth가 설정되어 있고, `role` claim도 있지만 여전�
 ## 원인 분석
 
 RLS 정책이 다음을 확인합니다:
+
 ```sql
 (storage.foldername(name))[1] = (auth.jwt()->>'sub')
 ```
 
 이것은:
+
 1. 파일 경로의 첫 번째 폴더명 (예: `user_123abc/file.jpg` → `user_123abc`)
 2. JWT의 `sub` claim 값
 
@@ -28,7 +30,7 @@ Supabase Dashboard의 SQL Editor에서 다음을 실행하여 현재 JWT의 내�
 SELECT auth.jwt();
 
 -- 또는 특정 claim만 확인
-SELECT 
+SELECT
   auth.jwt()->>'sub' as sub,
   auth.jwt()->>'role' as role,
   auth.jwt()->>'email' as email;
@@ -50,6 +52,7 @@ const filePath = `${user.id}/${fileName}`;
 ### 3. Clerk User ID 형식 확인
 
 Clerk의 user ID는 보통 다음과 같은 형식입니다:
+
 - `user_2abc123def456...` (접두사 `user_` 포함)
 
 JWT의 `sub` claim도 동일한 형식이어야 합니다.
@@ -104,6 +107,7 @@ WITH CHECK (bucket_id = 'uploads');
 ### Clerk 토큰이 제대로 전달되는지 확인
 
 브라우저 개발자 도구의 Network 탭에서:
+
 1. Storage 업로드 요청 확인
 2. `Authorization` 헤더에 JWT 토큰이 포함되어 있는지 확인
 3. 토큰을 [jwt.io](https://jwt.io)에서 디코딩하여 `sub` claim 확인
@@ -111,6 +115,7 @@ WITH CHECK (bucket_id = 'uploads');
 ### Supabase 로그 확인
 
 Supabase Dashboard → Logs → API에서:
+
 1. Storage 요청 로그 확인
 2. RLS 정책 위반 오류 메시지 확인
 3. JWT 파싱 오류가 있는지 확인
@@ -122,4 +127,3 @@ Supabase Dashboard → Logs → API에서:
 3. 파일 업로드 시도
 4. 여전히 오류가 발생하면 디버깅 함수로 JWT 내용 확인
 5. JWT의 `sub`와 파일 경로의 폴더명이 일치하는지 확인
-
