@@ -6,37 +6,37 @@
 
 #### Day 1-2: 프로젝트 초기 설정
 
-- [ ] Next.js 15 프로젝트 생성 (App Router)
-- [ ] TypeScript 설정
-- [ ] Tailwind CSS 설정
-- [ ] pnpm 패키지 매니저 설정
-- [ ] ESLint + Prettier 설정
+- [x] Next.js 15 프로젝트 생성 (App Router)
+- [x] TypeScript 설정
+- [x] Tailwind CSS 설정
+- [x] pnpm 패키지 매니저 설정
+- [x] ESLint + Prettier 설정
 - [ ] Git 저장소 초기화
 - [ ] Vercel 프로젝트 연결
 
 #### Day 3-4: Clerk 인증 시스템
 
-- [ ] Clerk 프로젝트 생성
-- [ ] Clerk 환경 변수 설정
-- [ ] Clerk 미들웨어 구현 (`middleware.ts`)
-- [ ] 역할 기반 라우팅 설정
-- [ ] 로그인 페이지 (`/sign-in`)
-- [ ] 회원가입 페이지 (`/sign-up`) + 역할 선택
-- [ ] 랜딩 페이지 (`/`) - 서비스 소개 + 로그인 버튼
-- [ ] 인증 상태 확인 유틸리티 함수
+- [x] Clerk 프로젝트 생성
+- [x] Clerk 환경 변수 설정
+- [x] Clerk 미들웨어 구현 (`middleware.ts`)
+- [x] 역할 기반 라우팅 설정
+- [x] 로그인 페이지 (`/sign-in`)
+- [x] 회원가입 페이지 (`/sign-up`) + 역할 선택
+- [x] 랜딩 페이지 (`/`) - 서비스 소개 + 로그인 버튼
+- [x] 인증 상태 확인 유틸리티 함수
 
 #### Day 5: Supabase 데이터베이스 설정
 
-- [ ] Supabase 프로젝트 생성
-- [ ] 데이터베이스 스키마 생성:
-  - [ ] `accounts` 테이블
-  - [ ] `clients` 테이블
-  - [ ] `housing_requirements` 테이블
-  - [ ] `checklist_items` 테이블
-  - [ ] `messages` 테이블
-- [ ] RLS (Row Level Security) 정책 설정
-- [ ] Supabase 클라이언트 설정 (Clerk JWT 연동)
-- [ ] 환경 변수 설정
+- [x] Supabase 프로젝트 생성
+- [x] 데이터베이스 스키마 생성:
+  - [x] `accounts` 테이블
+  - [x] `clients` 테이블
+  - [x] `housing_requirements` 테이블
+  - [x] `checklist_items` 테이블
+  - [x] `messages` 테이블
+- [x] RLS (Row Level Security) 정책 설정
+- [x] Supabase 클라이언트 설정 (Clerk JWT 연동)
+- [x] 환경 변수 설정
 
 #### Day 6-7: 에이전트 대시보드
 
