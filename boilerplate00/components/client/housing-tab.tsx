@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +29,20 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
     bedrooms: initialData?.bedrooms || "2",
     bathrooms: initialData?.bathrooms || "2",
   });
+
+  // initialData가 변경될 때 formData 업데이트 (저장 후 반영)
+  useEffect(() => {
+    if (initialData) {
+      setFormData((prev) => ({
+        preferredArea: initialData.preferredArea ?? prev.preferredArea,
+        maxBudget: initialData.maxBudget ?? prev.maxBudget,
+        housingType: initialData.housingType ?? prev.housingType,
+        bedrooms: initialData.bedrooms ?? prev.bedrooms,
+        bathrooms: initialData.bathrooms ?? prev.bathrooms,
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData?.preferredArea, initialData?.maxBudget, initialData?.housingType, initialData?.bedrooms, initialData?.bathrooms]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

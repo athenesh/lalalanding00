@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/layout/header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,20 +12,97 @@ import HousingTab from "@/components/client/housing-tab";
 import ChecklistTab from "@/components/client/checklist-tab";
 import ChatTab from "@/components/client/chat-tab";
 
+// 타입 정의 (나중에 API로 교체 시 사용)
+interface ClientProfileData {
+  name: string;
+  email: string;
+  phone: string;
+  occupation: string;
+  movingDate: string; // YYYY-MM-DD 형식
+}
+
+interface HousingData {
+  preferredArea: string;
+  maxBudget: string;
+  housingType: string;
+  bedrooms: string;
+  bathrooms: string;
+}
+
 export default function AgentClientDetailPage() {
   // const params = useParams(); // TODO: 실제 데이터 연동 시 사용
   const router = useRouter();
 
-  // Mock data - will be replaced with real data
-  const [clientData] = useState({
+  // Mock data - 로컬 상태로 관리 (나중에 API로 교체)
+  const [clientProfile, setClientProfile] = useState<ClientProfileData>({
     name: "홍길동",
+    email: "hong@example.com",
+    phone: "010-1234-5678",
     occupation: "doctor",
     movingDate: "2025-06-01",
   });
 
-  const daysUntilMoving = Math.ceil(
-    (new Date(clientData.movingDate).getTime() - new Date().getTime()) /
-      (1000 * 60 * 60 * 24),
+  const [housingData, setHousingData] = useState<HousingData>({
+    preferredArea: "로스앤젤레스, CA",
+    maxBudget: "3000",
+    housingType: "apartment",
+    bedrooms: "2",
+    bathrooms: "2",
+  });
+
+  // 프로필 저장 핸들러 (Mock - 나중에 API로 교체)
+  const handleSaveProfile = (data: {
+    name: string;
+    email: string;
+    phone: string;
+    occupation: string;
+    movingDate: Date | undefined;
+  }) => {
+    // 로컬 상태 업데이트
+    setClientProfile({
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      occupation: data.occupation,
+      movingDate: data.movingDate
+        ? data.movingDate.toISOString().split("T")[0]
+        : clientProfile.movingDate,
+    });
+
+    // TODO: 나중에 실제 API 호출로 교체
+    // const response = await fetch(`/api/clients/${params.id}`, {
+    //   method: "PATCH",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({
+    //     name: data.name,
+    //     email: data.email,
+    //     phone: data.phone,
+    //     occupation: data.occupation,
+    //     moving_date: data.movingDate?.toISOString().split("T")[0],
+    //   }),
+    // });
+  };
+
+  // 주거 옵션 저장 핸들러 (Mock - 나중에 API로 교체)
+  const handleSaveHousing = (data: HousingData) => {
+    // 로컬 상태 업데이트
+    setHousingData(data);
+
+    // TODO: 나중에 실제 API 호출로 교체
+    // const response = await fetch(`/api/housing/${params.id}`, {
+    //   method: "PATCH",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify(data),
+    // });
+  };
+
+  const daysUntilMoving = useMemo(
+    () =>
+      Math.ceil(
+        (new Date(clientProfile.movingDate).getTime() - new Date().getTime()) /
+          (1000 * 60 * 60 * 24),
+      ),
+    [clientProfile.movingDate],
   );
 
   return (
@@ -45,9 +122,9 @@ export default function AgentClientDetailPage() {
         <div className="space-y-6">
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-3xl font-bold">{clientData.name}</h1>
+              <h1 className="text-3xl font-bold">{clientProfile.name}</h1>
               <p className="text-muted-foreground mt-2">
-                {new Date(clientData.movingDate).toLocaleDateString("ko-KR")}{" "}
+                {new Date(clientProfile.movingDate).toLocaleDateString("ko-KR")}{" "}
                 이주 예정
               </p>
             </div>
@@ -71,12 +148,13 @@ export default function AgentClientDetailPage() {
                   <h2 className="text-xl font-semibold mb-6">기본 정보</h2>
                   <ProfileTab
                     initialData={{
-                      name: clientData.name,
-                      email: "hong@example.com",
-                      phone: "010-1234-5678",
-                      occupation: clientData.occupation,
-                      movingDate: new Date(clientData.movingDate),
+                      name: clientProfile.name,
+                      email: clientProfile.email,
+                      phone: clientProfile.phone,
+                      occupation: clientProfile.occupation,
+                      movingDate: new Date(clientProfile.movingDate),
                     }}
+                    onSave={handleSaveProfile}
                   />
                 </div>
               </TabsContent>
@@ -85,13 +163,8 @@ export default function AgentClientDetailPage() {
                 <div className="bg-card rounded-lg border border-border p-6">
                   <h2 className="text-xl font-semibold mb-6">주거 옵션</h2>
                   <HousingTab
-                    initialData={{
-                      preferredArea: "로스앤젤레스, CA",
-                      maxBudget: "3000",
-                      housingType: "apartment",
-                      bedrooms: "2",
-                      bathrooms: "2",
-                    }}
+                    initialData={housingData}
+                    onSave={handleSaveHousing}
                   />
                 </div>
               </TabsContent>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +35,20 @@ export default function ProfileTab({ initialData, onSave }: ProfileTabProps) {
     occupation: initialData?.occupation || "",
     movingDate: initialData?.movingDate,
   });
+
+  // initialData가 변경될 때 formData 업데이트 (저장 후 반영)
+  useEffect(() => {
+    if (initialData) {
+      setFormData((prev) => ({
+        name: initialData.name ?? prev.name,
+        email: initialData.email ?? prev.email,
+        phone: initialData.phone ?? prev.phone,
+        occupation: initialData.occupation ?? prev.occupation,
+        movingDate: initialData.movingDate ?? prev.movingDate,
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData?.name, initialData?.email, initialData?.phone, initialData?.occupation, initialData?.movingDate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
