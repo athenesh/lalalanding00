@@ -17,7 +17,8 @@ export default function AgentSignUpPage() {
               card: "shadow-lg",
             },
           }}
-          signUpFallbackRedirectUrl="/sign-up/agent/complete"
+          fallbackRedirectUrl="/sign-up/agent/complete"
+          signInFallbackRedirectUrl="/sign-in"
           routing="path"
           path="/sign-up/agent"
         />

@@ -17,7 +17,8 @@ export default function ClientSignUpPage() {
               card: "shadow-lg",
             },
           }}
-          signUpFallbackRedirectUrl="/sign-up/client/complete"
+          fallbackRedirectUrl="/sign-up/client/complete"
+          signInFallbackRedirectUrl="/sign-in"
           routing="path"
           path="/sign-up/client"
         />

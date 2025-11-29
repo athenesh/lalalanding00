@@ -11,17 +11,26 @@ const isPublicRoute = createRouteMatcher([
 
 export default clerkMiddleware(async (auth, req) => {
   const { userId, sessionClaims } = await auth();
-  const role = sessionClaims?.publicMetadata?.role as string | undefined;
+  const role = (sessionClaims?.publicMetadata as { role?: string })?.role;
   const pathname = req.nextUrl.pathname;
 
   // 로그인한 사용자가 공개 라우트에 접근하는 경우
-  if (userId && isPublicRoute(req) && pathname !== '/') {
-    // 역할에 따라 적절한 페이지로 리다이렉트
-    if (role === 'agent') {
-      return NextResponse.redirect(new URL('/agent/dashboard', req.url));
+  if (userId && isPublicRoute(req)) {
+    // 회원가입 완료 페이지는 역할 설정 중이므로 리다이렉트하지 않음
+    if (pathname === '/sign-up/agent/complete' || pathname === '/sign-up/client/complete') {
+      return NextResponse.next();
     }
-    if (role === 'client') {
-      return NextResponse.redirect(new URL('/client/home', req.url));
+    
+    // 루트 경로나 로그인/회원가입 페이지 접근 시 역할에 따라 리다이렉트
+    // 단, 역할이 없으면 리다이렉트하지 않음 (회원가입 진행 중일 수 있음)
+    if (pathname === '/' || pathname.startsWith('/sign-in') || pathname.startsWith('/sign-up')) {
+      if (role === 'agent') {
+        return NextResponse.redirect(new URL('/agent/dashboard', req.url));
+      }
+      if (role === 'client') {
+        return NextResponse.redirect(new URL('/client/home', req.url));
+      }
+      // 역할이 없으면 그대로 진행 (회원가입 진행 중일 수 있음)
     }
   }
 
@@ -32,14 +41,24 @@ export default clerkMiddleware(async (auth, req) => {
       return NextResponse.redirect(new URL('/sign-in', req.url));
     }
 
-    // 에이전트 전용 라우트
-    if (pathname.startsWith('/agent') && role !== 'agent') {
-      return NextResponse.redirect(new URL('/', req.url));
+    // 에이전트 전용 라우트 - role이 명확히 다른 역할인 경우만 차단
+    // role이 없거나 undefined인 경우는 페이지에서 클라이언트 사이드로 체크하도록 허용
+    if (pathname.startsWith('/agent')) {
+      if (role && role !== 'agent') {
+        console.log(`[Middleware] Access denied to ${pathname}: role is '${role}', expected 'agent'`);
+        return NextResponse.redirect(new URL('/', req.url));
+      }
+      // role이 없으면 일단 허용하고, 페이지에서 클라이언트 사이드로 체크
     }
 
-    // 클라이언트 전용 라우트
-    if (pathname.startsWith('/client') && role !== 'client') {
-      return NextResponse.redirect(new URL('/', req.url));
+    // 클라이언트 전용 라우트 - role이 명확히 다른 역할인 경우만 차단
+    // role이 없거나 undefined인 경우는 페이지에서 클라이언트 사이드로 체크하도록 허용
+    if (pathname.startsWith('/client')) {
+      if (role && role !== 'client') {
+        console.log(`[Middleware] Access denied to ${pathname}: role is '${role}', expected 'client'`);
+        return NextResponse.redirect(new URL('/', req.url));
+      }
+      // role이 없으면 일단 허용하고, 페이지에서 클라이언트 사이드로 체크
     }
   }
 });

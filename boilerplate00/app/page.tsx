@@ -1,79 +1,201 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { SignedOut, SignedIn } from "@clerk/nextjs";
-import { getAuthRole } from "@/lib/auth";
-import { redirect } from "next/navigation";
+"use client";
 
-export default async function Home() {
-  // 로그인한 사용자는 역할에 따라 적절한 페이지로 리다이렉트
-  const role = await getAuthRole();
-  if (role === 'agent') {
-    redirect('/agent/dashboard');
-  }
-  if (role === 'client') {
-    redirect('/client/home');
-  }
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Briefcase,
+  Users,
+  LayoutDashboard,
+  Home as HomeIcon,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { SignedOut, SignedIn, useAuth, useUser } from "@clerk/nextjs";
+import { useEffect, useState, useRef } from "react";
+
+export default function Home() {
+  const router = useRouter();
+  const { isLoaded: authLoaded } = useAuth();
+  const { user, isLoaded: userLoaded } = useUser();
+  const [role, setRole] = useState<string | undefined>(undefined);
+  const hasRedirected = useRef(false);
+
+  // useUser를 통해 최신 publicMetadata 가져오기
+  useEffect(() => {
+    if (userLoaded && user) {
+      const userRole = (user.publicMetadata as { role?: string })?.role;
+      console.log("[HomePage] User role from useUser:", userRole);
+      console.log("[HomePage] Full publicMetadata:", user.publicMetadata);
+      setRole(userRole);
+    } else if (userLoaded && !user) {
+      setRole(undefined);
+    }
+  }, [user, userLoaded]);
+
+  // 역할이 확인되면 자동으로 대시보드로 리다이렉트 (한 번만 실행)
+  useEffect(() => {
+    if (authLoaded && userLoaded && role && !hasRedirected.current) {
+      hasRedirected.current = true;
+      if (role === "agent") {
+        console.log("[HomePage] Redirecting agent to dashboard (one-time)");
+        // window.location.href를 사용하여 강제 리다이렉트 (세션 새로고침)
+        window.location.href = "/agent/dashboard";
+      } else if (role === "client") {
+        console.log("[HomePage] Redirecting client to home (one-time)");
+        // window.location.href를 사용하여 강제 리다이렉트 (세션 새로고침)
+        window.location.href = "/client/home";
+      }
+    }
+  }, [authLoaded, userLoaded, role]);
 
   return (
-    <main className="min-h-[calc(100vh-80px)] flex items-center px-8 py-16 lg:py-24">
-      <section className="w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 items-start lg:items-center">
-        {/* 좌측: 서비스 소개 */}
-        <div className="flex flex-col gap-8">
-          <h1 className="text-5xl lg:text-7xl font-bold leading-tight">
-            미국 이주 지원 플랫폼
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">
+      <div className="w-full max-w-4xl space-y-8">
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            미국 이주 준비 플랫폼
           </h1>
-          <p className="text-xl lg:text-2xl text-gray-600 dark:text-gray-400 leading-relaxed">
-            미국 이주를 준비하는 클라이언트와 이를 지원하는 에이전트를 위한
-            올인원 정보 관리 및 커뮤니케이션 플랫폼입니다.
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            체계적인 이주 준비와 효율적인 클라이언트 관리를 위한 올인원 솔루션
           </p>
-          <div className="flex flex-col gap-4 mt-4">
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 bg-primary rounded-full"></div>
-              <span className="text-lg">체계적인 이주 준비 체크리스트</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 bg-primary rounded-full"></div>
-              <span className="text-lg">실시간 커뮤니케이션</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 bg-primary rounded-full"></div>
-              <span className="text-lg">효율적인 클라이언트 관리</span>
-            </div>
-          </div>
         </div>
 
-        {/* 우측: 로그인 및 회원가입 버튼 */}
         <SignedOut>
-          <div className="flex flex-col gap-6">
-            <Link href="/sign-in" className="w-full">
-              <Button className="w-full h-16 text-lg shadow-lg hover:shadow-xl transition-shadow">
-                로그인
-              </Button>
-            </Link>
-            <div className="space-y-4">
-              <Link href="/sign-up/agent" className="w-full block">
-                <Button
-                  className="w-full h-16 text-lg shadow-lg hover:shadow-xl transition-shadow"
-                  variant="outline"
-                >
-                  에이전트로 가입하기
+          <div className="grid md:grid-cols-2 gap-6">
+            <Card
+              className="hover:shadow-xl transition-all duration-200 cursor-pointer group"
+              onClick={() => router.push("/sign-up/agent")}
+            >
+              <CardHeader className="space-y-4">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                  <Briefcase className="h-8 w-8 text-primary" />
+                </div>
+                <CardTitle className="text-2xl">에이전트</CardTitle>
+                <CardDescription className="text-base">
+                  여러 클라이언트를 효율적으로 관리하고 이주 준비를 지원하세요
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button className="w-full" size="lg">
+                  에이전트로 시작하기
                 </Button>
-              </Link>
-              <Link href="/sign-up/client" className="w-full block">
+              </CardContent>
+            </Card>
+
+            <Card
+              className="hover:shadow-xl transition-all duration-200 cursor-pointer group"
+              onClick={() => router.push("/sign-up/client")}
+            >
+              <CardHeader className="space-y-4">
+                <div className="w-16 h-16 rounded-2xl bg-success/10 flex items-center justify-center group-hover:bg-success/20 transition-colors">
+                  <Users className="h-8 w-8 text-success" />
+                </div>
+                <CardTitle className="text-2xl">클라이언트</CardTitle>
+                <CardDescription className="text-base">
+                  체계적인 준비 과정을 통해 안전한 미국 이주를 시작하세요
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
                 <Button
-                  className="w-full h-16 text-lg shadow-lg hover:shadow-xl transition-shadow"
-                  variant="outline"
+                  className="w-full bg-success hover:bg-success/90"
+                  size="lg"
                 >
-                  클라이언트로 가입하기
+                  클라이언트로 시작하기
                 </Button>
-              </Link>
-            </div>
-            <p className="text-sm text-gray-500 text-center mt-4">
-              역할에 맞는 회원가입을 선택해주세요
-            </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="text-center text-sm text-muted-foreground">
+            <p>LA/OC 지역 한인 이주 지원 전문 플랫폼</p>
           </div>
         </SignedOut>
-      </section>
-    </main>
+
+        <SignedIn>
+          {authLoaded && userLoaded && (
+            <div className="space-y-6">
+              {role === "agent" && (
+                <Card className="hover:shadow-xl transition-all duration-200">
+                  <CardHeader className="space-y-4">
+                    <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                      <LayoutDashboard className="h-8 w-8 text-primary" />
+                    </div>
+                    <CardTitle className="text-2xl">
+                      에이전트 대시보드
+                    </CardTitle>
+                    <CardDescription className="text-base">
+                      클라이언트를 관리하고 이주 준비를 지원하세요
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button
+                      className="w-full"
+                      size="lg"
+                      onClick={() => router.push("/agent/dashboard")}
+                    >
+                      대시보드로 이동
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {role === "client" && (
+                <Card className="hover:shadow-xl transition-all duration-200">
+                  <CardHeader className="space-y-4">
+                    <div className="w-16 h-16 rounded-2xl bg-success/10 flex items-center justify-center">
+                      <HomeIcon className="h-8 w-8 text-success" />
+                    </div>
+                    <CardTitle className="text-2xl">내 이주 준비</CardTitle>
+                    <CardDescription className="text-base">
+                      이주 준비 현황을 확인하고 관리하세요
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button
+                      className="w-full bg-success hover:bg-success/90"
+                      size="lg"
+                      onClick={() => router.push("/client/home")}
+                    >
+                      홈으로 이동
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!role && (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-4">
+                    역할이 설정되지 않았습니다. 회원가입을 완료해주세요.
+                  </p>
+                  <div className="grid md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push("/sign-up/agent/complete")}
+                    >
+                      에이전트 역할 설정
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push("/sign-up/client/complete")}
+                    >
+                      클라이언트 역할 설정
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="text-center text-sm text-muted-foreground">
+                <p>LA/OC 지역 한인 이주 지원 전문 플랫폼</p>
+              </div>
+            </div>
+          )}
+        </SignedIn>
+      </div>
+    </div>
   );
 }

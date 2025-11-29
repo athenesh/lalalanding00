@@ -8,22 +8,47 @@ export default function AgentSignUpCompletePage() {
   const [status, setStatus] = useState<"loading" | "success" | "error">(
     "loading",
   );
-  const { userId } = useAuth();
+  const { userId, isLoaded } = useAuth();
   const router = useRouter();
   const hasRun = useRef(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // 중복 실행 방지
+    // Clerk 인증 상태가 로드될 때까지 대기
+    if (!isLoaded) {
+      console.log("Clerk not loaded yet...");
+      return;
+    }
+
+    // userId가 없으면 최대 3초 대기
+    if (!userId) {
+      console.log("userId not available, waiting...");
+
+      // 이미 대기 중이면 중복 실행 방지
+      if (timeoutRef.current) return;
+
+      timeoutRef.current = setTimeout(() => {
+        if (!userId) {
+          console.error("userId not available after 3 seconds");
+          setStatus("error");
+        }
+      }, 3000);
+
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+      };
+    }
+
+    // userId가 있으면 역할 설정 시도
     if (hasRun.current) return;
     hasRun.current = true;
 
     const setRole = async () => {
-      if (!userId) {
-        setStatus("error");
-        return;
-      }
-
+      // setInterval 로직 제거하고 바로 API 호출
       try {
+        console.log("Setting role with userId:", userId);
         const response = await fetch("/api/set-role", {
           method: "POST",
           headers: {
@@ -33,20 +58,33 @@ export default function AgentSignUpCompletePage() {
         });
 
         const data = await response.json();
+        console.log("API Response:", { ok: response.ok, data });
 
-        // 역할이 이미 설정되어 있어도 성공으로 처리
-        if (
-          !response.ok &&
-          data.error !== "Role already set to different role"
-        ) {
+        // 성공 응답 처리
+        if (response.ok || data.success === true) {
+          console.log("Role set successfully");
+          setStatus("success");
+          // Clerk 세션이 업데이트될 시간을 주고 강제 리다이렉트
+          setTimeout(() => {
+            // window.location.href를 사용하여 강제 리다이렉트 (무한 루프 방지)
+            window.location.href = "/agent/dashboard";
+          }, 2000);
+          return;
+        }
+
+        // 에러 응답 처리
+        if (data.error && data.error !== "Role already set to different role") {
+          console.error("API Error:", data);
           throw new Error(data.error || "Failed to set role");
         }
 
+        // 역할이 이미 설정된 경우도 성공으로 처리
+        console.log("Role already set, treating as success");
         setStatus("success");
-        // 역할 설정 후 에이전트 대시보드로 리다이렉트
         setTimeout(() => {
-          router.push("/agent/dashboard");
-        }, 1000);
+          // window.location.href를 사용하여 강제 리다이렉트 (무한 루프 방지)
+          window.location.href = "/agent/dashboard";
+        }, 2000);
       } catch (error) {
         console.error("Error setting role:", error);
         setStatus("error");
@@ -54,7 +92,16 @@ export default function AgentSignUpCompletePage() {
     };
 
     setRole();
-  }, [userId, router]);
+  }, [userId, isLoaded, router]);
+
+  // cleanup 추가
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-80px)] px-4">

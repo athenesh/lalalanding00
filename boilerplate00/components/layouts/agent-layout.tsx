@@ -1,7 +1,6 @@
 import { ReactNode } from "react";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 
 interface AgentLayoutProps {
   children: ReactNode;
@@ -39,4 +38,3 @@ export function AgentLayout({ children }: AgentLayoutProps) {
     </div>
   );
 }
-

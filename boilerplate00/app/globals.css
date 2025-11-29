@@ -25,6 +25,10 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -60,6 +64,11 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --success: oklch(0.6 0.15 150);
+  --success-foreground: oklch(0.985 0 0);
+  --warning: oklch(0.75 0.15 80);
+  --warning-foreground: oklch(0.985 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -94,6 +103,11 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --success: oklch(0.6 0.15 150);
+  --success-foreground: oklch(0.985 0 0);
+  --warning: oklch(0.75 0.15 80);
+  --warning-foreground: oklch(0.985 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
@@ -118,8 +132,34 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-noto-sans-kr), var(--font-geist-sans), sans-serif;
   }
   main {
     @apply max-w-7xl mx-auto pt-16 px-4;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold;
+  }
+}
+
+@layer utilities {
+  .progress-bar {
+    @apply bg-success h-2 rounded-full transition-all duration-300;
+  }
+
+  .client-card {
+    @apply bg-card rounded-lg border border-border p-6 hover:shadow-lg transition-shadow duration-200;
+  }
+
+  .tab-active {
+    @apply border-b-2 border-primary text-primary font-semibold;
+  }
+
+  .chat-bubble-agent {
+    @apply bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-4 py-2 max-w-[70%] ml-auto;
+  }
+
+  .chat-bubble-client {
+    @apply bg-muted text-foreground rounded-2xl rounded-tl-sm px-4 py-2 max-w-[70%];
   }
 }
