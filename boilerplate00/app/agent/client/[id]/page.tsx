@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
 import Header from "@/components/layout/header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import ProfileTab from "@/components/client/profile-tab";
 import HousingTab from "@/components/client/housing-tab";
 import ChecklistTab from "@/components/client/checklist-tab";
 import ChatTab from "@/components/client/chat-tab";
+import { useToast } from "@/hooks/use-toast";
 
 // 타입 정의 (나중에 API로 교체 시 사용)
 interface ClientProfileData {
@@ -19,6 +20,8 @@ interface ClientProfileData {
   phone: string;
   occupation: string;
   movingDate: string; // YYYY-MM-DD 형식
+  relocationType: string;
+  birthDate: string | null; // YYYY-MM-DD 형식 또는 null
 }
 
 interface HousingData {
@@ -27,6 +30,14 @@ interface HousingData {
   housingType: string;
   bedrooms: string;
   bathrooms: string;
+  furnished: boolean;
+  hasWasherDryer: boolean;
+  parking: boolean;
+  hasPets: boolean;
+  petDetails: string;
+  schoolDistrict: boolean;
+  workplaceAddress: string;
+  additionalNotes: string;
 }
 
 interface ChecklistItem {
@@ -34,6 +45,10 @@ interface ChecklistItem {
   title: string;
   description: string[];
   completed: boolean;
+  notes?: string;
+  referenceUrl?: string;
+  completedAt?: Date;
+  isRequired?: boolean;
 }
 
 interface ChecklistCategory {
@@ -187,101 +202,570 @@ const initialChecklist: ChecklistCategory[] = [
 ];
 
 export default function AgentClientDetailPage() {
-  // const params = useParams(); // TODO: 실제 데이터 연동 시 사용
+  const params = useParams();
   const router = useRouter();
+  const { toast } = useToast();
+  const clientId = params.id as string;
 
-  // Mock data - 로컬 상태로 관리 (나중에 API로 교체)
-  const [clientProfile, setClientProfile] = useState<ClientProfileData>({
-    name: "홍길동",
-    email: "hong@example.com",
-    phone: "010-1234-5678",
-    occupation: "doctor",
-    movingDate: "2025-06-01",
-  });
+  // 로딩 상태
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const [housingData, setHousingData] = useState<HousingData>({
-    preferredArea: "로스앤젤레스, CA",
-    maxBudget: "3000",
-    housingType: "apartment",
-    bedrooms: "2",
-    bathrooms: "2",
-  });
+  // 클라이언트 프로필 데이터 (API에서 로드)
+  const [clientProfile, setClientProfile] = useState<ClientProfileData | null>(
+    null,
+  );
+
+  const [housingData, setHousingData] = useState<HousingData | null>(null);
+  const [isLoadingHousing, setIsLoadingHousing] = useState(true);
 
   const [checklistData, setChecklistData] =
     useState<ChecklistCategory[]>(initialChecklist);
+  const [isLoadingChecklist, setIsLoadingChecklist] = useState(true);
 
-  // 프로필 저장 핸들러 (Mock - 나중에 API로 교체)
-  const handleSaveProfile = (data: {
+  // 클라이언트 데이터 로드
+  useEffect(() => {
+    const loadClientData = async () => {
+      try {
+        setIsLoading(true);
+
+        // 클라이언트 데이터 로드 시작 로그
+        console.log("[ClientDetail] 클라이언트 데이터 로드 시작:", {
+          clientId,
+        });
+
+        const response = await fetch(`/api/clients/${clientId}`);
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            console.warn("[ClientDetail] 클라이언트를 찾을 수 없음:", {
+              clientId,
+            });
+            toast({
+              title: "클라이언트를 찾을 수 없습니다",
+              description: "클라이언트 목록으로 돌아갑니다.",
+              variant: "destructive",
+            });
+            router.push("/agent/dashboard");
+            return;
+          }
+          throw new Error("Failed to load client data");
+        }
+
+        const { client } = await response.json();
+
+        // 클라이언트 데이터 로드 성공 로그
+        console.log("[ClientDetail] 클라이언트 데이터 로드 성공:", {
+          clientId,
+          clientName: client.name,
+        });
+
+        setClientProfile({
+          name: client.name,
+          email: client.email,
+          phone: client.phone || "",
+          occupation: client.occupation,
+          movingDate: client.moving_date,
+          relocationType: client.relocation_type || "",
+          birthDate: client.birth_date || null,
+        });
+      } catch (error) {
+        console.error("[ClientDetail] 클라이언트 데이터 로드 실패:", error);
+        toast({
+          title: "데이터 로드 실패",
+          description: "클라이언트 정보를 불러오는데 실패했습니다.",
+          variant: "destructive",
+        });
+        router.push("/agent/dashboard");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (clientId) {
+      loadClientData();
+    }
+  }, [clientId, router, toast]);
+
+  // 주거 요구사항 데이터 로드
+  useEffect(() => {
+    const loadHousingData = async () => {
+      if (!clientId) return;
+
+      try {
+        setIsLoadingHousing(true);
+        console.log("[ClientDetail] 주거 요구사항 데이터 로드 시작:", {
+          clientId,
+        });
+
+        const response = await fetch(`/api/housing/${clientId}`);
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            // 주거 요구사항이 없으면 기본값 사용
+            console.log("[ClientDetail] 주거 요구사항 없음, 기본값 사용");
+            setHousingData({
+              preferredArea: "",
+              maxBudget: "",
+              housingType: "apartment",
+              bedrooms: "2",
+              bathrooms: "2",
+              furnished: false,
+              hasWasherDryer: false,
+              parking: false,
+              hasPets: false,
+              petDetails: "",
+              schoolDistrict: false,
+              workplaceAddress: "",
+              additionalNotes: "",
+            });
+            return;
+          }
+          throw new Error("Failed to load housing data");
+        }
+
+        const { housing } = await response.json();
+
+        if (housing) {
+          // DB 필드명 → UI 필드명 변환
+          setHousingData({
+            preferredArea: housing.preferred_city || "",
+            maxBudget: housing.budget_max?.toString() || "",
+            housingType: housing.housing_type || "apartment",
+            bedrooms: housing.bedrooms?.toString() || "2",
+            bathrooms: housing.bathrooms?.toString() || "2",
+            furnished: housing.furnished ?? false,
+            hasWasherDryer: housing.has_washer_dryer ?? false,
+            parking: housing.parking ?? false,
+            hasPets: housing.has_pets ?? false,
+            petDetails: housing.pet_details || "",
+            schoolDistrict: housing.school_district ?? false,
+            workplaceAddress: housing.workplace_address || "",
+            additionalNotes: housing.additional_notes || "",
+          });
+        } else {
+          // 주거 요구사항이 없으면 기본값 사용
+          setHousingData({
+            preferredArea: "",
+            maxBudget: "",
+            housingType: "apartment",
+            bedrooms: "2",
+            bathrooms: "2",
+            furnished: false,
+            hasWasherDryer: false,
+            parking: false,
+            hasPets: false,
+            petDetails: "",
+            schoolDistrict: false,
+            workplaceAddress: "",
+            additionalNotes: "",
+          });
+        }
+
+        console.log("[ClientDetail] 주거 요구사항 데이터 로드 성공:", {
+          clientId,
+        });
+      } catch (error) {
+        console.error("[ClientDetail] 주거 요구사항 데이터 로드 실패:", error);
+        // 에러가 발생해도 기본값으로 설정
+        setHousingData({
+          preferredArea: "",
+          maxBudget: "",
+          housingType: "apartment",
+          bedrooms: "2",
+          bathrooms: "2",
+          furnished: false,
+          hasWasherDryer: false,
+          parking: false,
+          hasPets: false,
+          petDetails: "",
+          schoolDistrict: false,
+          workplaceAddress: "",
+          additionalNotes: "",
+        });
+      } finally {
+        setIsLoadingHousing(false);
+      }
+    };
+
+    if (clientId) {
+      loadHousingData();
+    }
+  }, [clientId]);
+
+  // 체크리스트 데이터 로드
+  useEffect(() => {
+    const loadChecklistData = async () => {
+      if (!clientId) return;
+
+      try {
+        setIsLoadingChecklist(true);
+        console.log("[ClientDetail] 체크리스트 데이터 로드 시작:", {
+          clientId,
+        });
+
+        const response = await fetch(`/api/checklist/${clientId}`);
+
+        if (!response.ok) {
+          throw new Error("Failed to load checklist data");
+        }
+
+        const { checklist } = await response.json();
+
+        // DB 데이터를 UI 형식으로 변환
+        if (checklist && checklist.length > 0) {
+          // category별로 그룹화
+          const groupedByCategory: Record<string, any[]> = {};
+          checklist.forEach((item: any) => {
+            if (!groupedByCategory[item.category]) {
+              groupedByCategory[item.category] = [];
+            }
+            groupedByCategory[item.category].push(item);
+          });
+
+          // 하드코딩된 템플릿과 병합
+          const mergedChecklist = initialChecklist.map((category) => {
+            const dbItems = groupedByCategory[category.id] || [];
+
+            return {
+              ...category,
+              items: category.items.map((templateItem) => {
+                // 제목으로 매칭 (더 정확한 매칭을 위해 id도 확인)
+                const dbItem = dbItems.find(
+                  (item: any) =>
+                    item.title === templateItem.title ||
+                    item.id === templateItem.id,
+                );
+
+                if (dbItem) {
+                  return {
+                    ...templateItem,
+                    id: dbItem.id, // DB id 사용
+                    completed: dbItem.is_completed || false,
+                    notes: dbItem.notes || undefined,
+                    referenceUrl: dbItem.reference_url || undefined,
+                    completedAt: dbItem.completed_at
+                      ? new Date(dbItem.completed_at)
+                      : undefined,
+                    isRequired: dbItem.is_required || false,
+                  };
+                }
+                return templateItem;
+              }),
+            };
+          });
+
+          setChecklistData(mergedChecklist);
+        } else {
+          // 체크리스트가 없으면 템플릿만 사용
+          setChecklistData(initialChecklist);
+        }
+
+        console.log("[ClientDetail] 체크리스트 데이터 로드 성공:", {
+          clientId,
+          itemCount: checklist?.length || 0,
+        });
+      } catch (error) {
+        console.error("[ClientDetail] 체크리스트 데이터 로드 실패:", error);
+        // 에러가 발생해도 템플릿만 사용
+        setChecklistData(initialChecklist);
+      } finally {
+        setIsLoadingChecklist(false);
+      }
+    };
+
+    if (clientId) {
+      loadChecklistData();
+    }
+  }, [clientId]);
+
+  // 프로필 저장 핸들러 (API 호출)
+  const handleSaveProfile = async (data: {
     name: string;
     email: string;
     phone: string;
     occupation: string;
     movingDate: Date | undefined;
+    relocationType: string;
+    birthDate: Date | undefined;
   }) => {
-    // 로컬 상태 업데이트
-    setClientProfile({
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      occupation: data.occupation,
-      movingDate: data.movingDate
-        ? data.movingDate.toISOString().split("T")[0]
-        : clientProfile.movingDate,
-    });
+    try {
+      setIsSaving(true);
 
-    // TODO: 나중에 실제 API 호출로 교체
-    // const response = await fetch(`/api/clients/${params.id}`, {
-    //   method: "PATCH",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify({
-    //     name: data.name,
-    //     email: data.email,
-    //     phone: data.phone,
-    //     occupation: data.occupation,
-    //     moving_date: data.movingDate?.toISOString().split("T")[0],
-    //   }),
-    // });
+      const requestBody = {
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        occupation: data.occupation,
+        moving_date: data.movingDate?.toISOString().split("T")[0],
+        relocation_type: data.relocationType,
+        birth_date: data.birthDate?.toISOString().split("T")[0] || null,
+      };
+
+      // API 호출 시작 로그
+      console.log("[ClientDetail] 프로필 업데이트 API 호출 시작:", {
+        clientId,
+        data: requestBody,
+      });
+
+      const response = await fetch(`/api/clients/${clientId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("[ClientDetail] 프로필 업데이트 실패:", {
+          status: response.status,
+          error: errorData.error,
+        });
+        throw new Error(errorData.error || "Failed to update client");
+      }
+
+      const { client } = await response.json();
+
+      // API 호출 성공 로그
+      console.log("[ClientDetail] 프로필 업데이트 성공:", {
+        clientId,
+        updatedClient: client,
+      });
+
+      // 로컬 상태 업데이트
+      setClientProfile({
+        name: client.name,
+        email: client.email,
+        phone: client.phone || "",
+        occupation: client.occupation,
+        movingDate: client.moving_date,
+        relocationType: client.relocation_type || "",
+        birthDate: client.birth_date || null,
+      });
+
+      toast({
+        title: "저장 완료",
+        description: "프로필 정보가 성공적으로 저장되었습니다.",
+      });
+    } catch (error) {
+      console.error("[ClientDetail] 프로필 저장 중 에러 발생:", error);
+      toast({
+        title: "저장 실패",
+        description:
+          error instanceof Error
+            ? error.message
+            : "프로필 정보 저장에 실패했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  // 주거 옵션 저장 핸들러 (Mock - 나중에 API로 교체)
-  const handleSaveHousing = (data: HousingData) => {
-    // 로컬 상태 업데이트
-    setHousingData(data);
+  // 주거 옵션 저장 핸들러 (API 호출)
+  const handleSaveHousing = async (data: HousingData) => {
+    try {
+      setIsSaving(true);
 
-    // TODO: 나중에 실제 API 호출로 교체
-    // const response = await fetch(`/api/housing/${params.id}`, {
-    //   method: "PATCH",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify(data),
-    // });
+      console.log("[ClientDetail] 주거 요구사항 업데이트 API 호출 시작:", {
+        clientId,
+        data,
+      });
+
+      const response = await fetch(`/api/housing/${clientId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("[ClientDetail] 주거 요구사항 업데이트 실패:", {
+          status: response.status,
+          error: errorData.error,
+        });
+        throw new Error(
+          errorData.error || "Failed to update housing requirements",
+        );
+      }
+
+      const { housing } = await response.json();
+
+      // 로컬 상태 업데이트 (DB 필드명 → UI 필드명 변환)
+      setHousingData({
+        preferredArea: housing.preferred_city || "",
+        maxBudget: housing.budget_max?.toString() || "",
+        housingType: housing.housing_type || "apartment",
+        bedrooms: housing.bedrooms?.toString() || "2",
+        bathrooms: housing.bathrooms?.toString() || "2",
+        furnished: housing.furnished ?? false,
+        hasWasherDryer: housing.has_washer_dryer ?? false,
+        parking: housing.parking ?? false,
+        hasPets: housing.has_pets ?? false,
+        petDetails: housing.pet_details || "",
+        schoolDistrict: housing.school_district ?? false,
+        workplaceAddress: housing.workplace_address || "",
+        additionalNotes: housing.additional_notes || "",
+      });
+
+      console.log("[ClientDetail] 주거 요구사항 업데이트 성공:", {
+        clientId,
+        housingId: housing.id,
+      });
+
+      toast({
+        title: "저장 완료",
+        description: "주거 옵션이 성공적으로 저장되었습니다.",
+      });
+    } catch (error) {
+      console.error("[ClientDetail] 주거 요구사항 저장 중 에러 발생:", error);
+      toast({
+        title: "저장 실패",
+        description:
+          error instanceof Error
+            ? error.message
+            : "주거 옵션 저장에 실패했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  // 체크리스트 저장 핸들러 (Mock - 나중에 API로 교체)
-  const handleSaveChecklist = (data: ChecklistCategory[]) => {
-    // 로컬 상태 업데이트
-    setChecklistData(data);
+  // 체크리스트 저장 핸들러 (API 호출)
+  const handleSaveChecklist = async (data: ChecklistCategory[]) => {
+    try {
+      setIsSaving(true);
 
-    // TODO: 나중에 실제 API 호출로 교체
-    // const response = await fetch(`/api/checklist/${params.id}`, {
-    //   method: "PATCH",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify({
-    //     items: data.flatMap(cat => cat.items.map(item => ({
-    //       id: item.id,
-    //       completed: item.completed
-    //     })))
-    //   }),
-    // });
+      // 모든 항목을 평탄화하여 업데이트할 항목 목록 생성
+      const itemsToUpdate = data.flatMap((category) =>
+        category.items
+          .filter((item) => item.id) // DB에 저장된 항목만 (id가 있는 것만)
+          .map((item) => ({
+            id: item.id,
+            completed: item.completed || false,
+            notes: item.notes || null,
+            referenceUrl: item.referenceUrl || null,
+            completedAt: item.completed ? item.completedAt || new Date() : null,
+          })),
+      );
+
+      console.log("[ClientDetail] 체크리스트 업데이트 API 호출 시작:", {
+        clientId,
+        itemCount: itemsToUpdate.length,
+      });
+
+      const response = await fetch(`/api/checklist/${clientId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: itemsToUpdate,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("[ClientDetail] 체크리스트 업데이트 실패:", {
+          status: response.status,
+          error: errorData.error,
+        });
+        throw new Error(errorData.error || "Failed to update checklist");
+      }
+
+      const { updated } = (await response.json()) as {
+        updated: Array<{
+          id: string;
+          is_completed: boolean | null;
+          notes: string | null;
+          reference_url: string | null;
+          completed_at: string | null;
+        }>;
+      };
+
+      // 로컬 상태 업데이트 (업데이트된 항목 반영)
+      const updatedItemsMap = new Map(updated.map((item) => [item.id, item]));
+
+      setChecklistData((prev) =>
+        prev.map((category) => ({
+          ...category,
+          items: category.items.map((item) => {
+            const updatedItem = updatedItemsMap.get(item.id);
+            if (updatedItem) {
+              return {
+                ...item,
+                completed: updatedItem.is_completed || false,
+                notes: updatedItem.notes || undefined,
+                referenceUrl: updatedItem.reference_url || undefined,
+                completedAt: updatedItem.completed_at
+                  ? new Date(updatedItem.completed_at)
+                  : undefined,
+              };
+            }
+            return item;
+          }),
+        })),
+      );
+
+      console.log("[ClientDetail] 체크리스트 업데이트 성공:", {
+        clientId,
+        updatedCount: updated.length,
+      });
+
+      toast({
+        title: "저장 완료",
+        description: "체크리스트가 성공적으로 저장되었습니다.",
+      });
+    } catch (error) {
+      console.error("[ClientDetail] 체크리스트 저장 중 에러 발생:", error);
+      toast({
+        title: "저장 실패",
+        description:
+          error instanceof Error
+            ? error.message
+            : "체크리스트 저장에 실패했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const daysUntilMoving = useMemo(
-    () =>
-      Math.ceil(
-        (new Date(clientProfile.movingDate).getTime() - new Date().getTime()) /
-          (1000 * 60 * 60 * 24),
-      ),
-    [clientProfile.movingDate],
-  );
+  const daysUntilMoving = useMemo(() => {
+    if (!clientProfile?.movingDate) return 0;
+    return Math.ceil(
+      (new Date(clientProfile.movingDate).getTime() - new Date().getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+  }, [clientProfile?.movingDate]);
+
+  // 로딩 중일 때
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header title="클라이언트 상세" userName="에이전트" />
+        <main className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <p className="text-muted-foreground">로딩 중...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // 클라이언트 데이터가 없을 때
+  if (!clientProfile) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header title="클라이언트 상세" userName="에이전트" />
+        <main className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <p className="text-muted-foreground">
+              클라이언트 정보를 불러올 수 없습니다.
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -331,8 +815,13 @@ export default function AgentClientDetailPage() {
                       phone: clientProfile.phone,
                       occupation: clientProfile.occupation,
                       movingDate: new Date(clientProfile.movingDate),
+                      relocationType: clientProfile.relocationType,
+                      birthDate: clientProfile.birthDate
+                        ? new Date(clientProfile.birthDate)
+                        : undefined,
                     }}
                     onSave={handleSaveProfile}
+                    isSaving={isSaving}
                   />
                 </div>
               </TabsContent>
@@ -340,18 +829,30 @@ export default function AgentClientDetailPage() {
               <TabsContent value="housing" className="space-y-6">
                 <div className="bg-card rounded-lg border border-border p-6">
                   <h2 className="text-xl font-semibold mb-6">주거 옵션</h2>
-                  <HousingTab
-                    initialData={housingData}
-                    onSave={handleSaveHousing}
-                  />
+                  {isLoadingHousing ? (
+                    <div className="flex items-center justify-center py-8">
+                      <p className="text-muted-foreground">로딩 중...</p>
+                    </div>
+                  ) : housingData ? (
+                    <HousingTab
+                      initialData={housingData}
+                      onSave={handleSaveHousing}
+                    />
+                  ) : null}
                 </div>
               </TabsContent>
 
               <TabsContent value="checklist" className="space-y-6">
-                <ChecklistTab
-                  initialData={checklistData}
-                  onSave={handleSaveChecklist}
-                />
+                {isLoadingChecklist ? (
+                  <div className="flex items-center justify-center py-8">
+                    <p className="text-muted-foreground">로딩 중...</p>
+                  </div>
+                ) : (
+                  <ChecklistTab
+                    initialData={checklistData}
+                    onSave={handleSaveChecklist}
+                  />
+                )}
               </TabsContent>
 
               <TabsContent value="chat" className="space-y-6">

@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
-import { getAuthUserId, getAuthRole, getOrCreateAccount } from "@/lib/auth";
+import { getAuthRole, getOrCreateAccount } from "@/lib/auth";
 import { createClerkSupabaseClient } from "@/lib/supabase/server";
 
 /**
- * GET /api/clients
- * 에이전트의 클라이언트 목록을 조회합니다.
+ * GET /api/clients/unassigned
+ * 할당되지 않은 클라이언트 목록을 조회합니다.
+ * 프로필 작성 완료 상태도 함께 반환합니다.
  */
 export async function GET() {
   try {
     // API 호출 시작 로그
-    console.log("[API] GET /api/clients 호출 시작");
+    console.log("[API] GET /api/clients/unassigned 호출 시작");
 
     // 에이전트 권한 확인
     const role = await getAuthRole();
@@ -21,9 +22,7 @@ export async function GET() {
       );
     }
 
-    const userId = await getAuthUserId();
     const supabase = createClerkSupabaseClient();
-    console.log("[API] User ID:", userId);
 
     // Account 조회 또는 자동 생성
     let account;
@@ -50,8 +49,8 @@ export async function GET() {
       );
     }
 
-    // 클라이언트 목록 조회 (체크리스트 완료율 포함)
-    console.log("[API] 클라이언트 목록 조회 시도:", { accountId: account.id });
+    // 할당되지 않은 클라이언트 목록 조회 (owner_agent_id가 null)
+    console.log("[API] 할당되지 않은 클라이언트 목록 조회 시도");
     const { data: clients, error: clientsError } = await supabase
       .from("clients")
       .select(
@@ -63,19 +62,18 @@ export async function GET() {
         phone_us,
         occupation,
         moving_date,
+        relocation_type,
+        birth_date,
         created_at,
         updated_at,
-        checklist_items (
-          id,
-          is_completed
-        )
+        clerk_user_id
       `,
       )
-      .eq("owner_agent_id", account.id)
+      .is("owner_agent_id", null)
       .order("created_at", { ascending: false });
 
     if (clientsError) {
-      console.error("[API] Clients fetch error:", {
+      console.error("[API] Unassigned clients fetch error:", {
         accountId: account.id,
         error: clientsError,
         errorCode: clientsError?.code,
@@ -85,7 +83,7 @@ export async function GET() {
       });
       return NextResponse.json(
         {
-          error: "Failed to fetch clients",
+          error: "Failed to fetch unassigned clients",
           details: clientsError.message || "Unknown error",
           code: clientsError?.code,
           hint: clientsError?.hint,
@@ -94,45 +92,45 @@ export async function GET() {
       );
     }
 
-    console.log("[API] 클라이언트 목록 조회 성공:", {
-      accountId: account.id,
+    console.log("[API] 할당되지 않은 클라이언트 목록 조회 성공:", {
       clientCount: clients?.length || 0,
     });
 
-    // 체크리스트 완료율 계산
-    const clientsWithProgress = clients?.map((client) => {
-      const checklistItems = client.checklist_items || [];
-      const totalItems = checklistItems.length;
-      const completedItems = checklistItems.filter(
-        (item: any) => item.is_completed,
-      ).length;
-      const completionRate =
-        totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+    // 프로필 작성 완료 상태 계산
+    // 필수 필드: name, email, occupation, moving_date, relocation_type
+    const clientsWithProfileStatus = clients?.map((client) => {
+      const isProfileComplete =
+        client.name &&
+        client.email &&
+        client.occupation &&
+        client.moving_date &&
+        client.relocation_type &&
+        client.name.trim() !== "" &&
+        client.email.trim() !== "" &&
+        client.occupation.trim() !== "" &&
+        client.relocation_type.trim() !== "";
 
       return {
         id: client.id,
         name: client.name,
         email: client.email,
-        phone: client.phone_kr || client.phone_us || null, // 수정
+        phone: client.phone_kr || client.phone_us || null,
         occupation: client.occupation,
         moving_date: client.moving_date,
+        relocation_type: client.relocation_type,
+        birth_date: client.birth_date,
         created_at: client.created_at,
         updated_at: client.updated_at,
-        checklist_completion_rate: Math.round(completionRate),
-        checklist_total: totalItems,
-        checklist_completed: completedItems,
+        clerk_user_id: client.clerk_user_id,
+        is_profile_complete: isProfileComplete,
       };
     });
 
-    console.log("[API] GET /api/clients 완료:", {
-      clientCount: clientsWithProgress?.length || 0,
-    });
-
     return NextResponse.json({
-      clients: clientsWithProgress || [],
+      clients: clientsWithProfileStatus || [],
     });
   } catch (error) {
-    console.error("[API] Error in GET /api/clients:", {
+    console.error("[API] Error in GET /api/clients/unassigned:", {
       error,
       errorMessage: error instanceof Error ? error.message : "Unknown error",
       errorStack: error instanceof Error ? error.stack : undefined,

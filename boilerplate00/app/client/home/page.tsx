@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import Header from "@/components/layout/header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,12 +14,14 @@ import ChecklistTab from "@/components/client/checklist-tab";
 import ChatTab from "@/components/client/chat-tab";
 
 export default function ClientHomePage() {
-  const { userId, sessionClaims, isLoaded } = useAuth();
+  const { userId, isLoaded: authLoaded } = useAuth();
+  const { user, isLoaded: userLoaded } = useUser();
   const router = useRouter();
 
   // 클라이언트 역할 체크
   useEffect(() => {
-    if (!isLoaded) return;
+    // 인증과 사용자 데이터가 모두 로드될 때까지 대기
+    if (!authLoaded || !userLoaded) return;
 
     if (!userId) {
       console.log("[ClientHomePage] No userId, redirecting to sign-in");
@@ -27,7 +29,8 @@ export default function ClientHomePage() {
       return;
     }
 
-    const role = (sessionClaims?.publicMetadata as { role?: string })?.role;
+    // useUser를 통해 최신 publicMetadata 가져오기
+    const role = (user?.publicMetadata as { role?: string })?.role;
     console.log("[ClientHomePage] Current role:", role);
 
     if (role !== "client") {
@@ -37,7 +40,7 @@ export default function ClientHomePage() {
       router.push("/");
       return;
     }
-  }, [userId, sessionClaims, isLoaded, router]);
+  }, [userId, user, authLoaded, userLoaded, router]);
   const [clientData] = useState({
     name: "홍길동",
     movingDate: "2025-06-01",

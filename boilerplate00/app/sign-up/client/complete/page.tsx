@@ -62,24 +62,28 @@ export default function ClientSignUpCompletePage() {
         // 성공 응답 처리
         if (response.ok || data.success === true) {
           console.log("Role set successfully");
-          setStatus("success");
-          // Clerk 세션이 업데이트될 시간을 주고 강제 리다이렉트
-          setTimeout(() => {
-            // window.location.href를 사용하여 강제 리다이렉트 (무한 루프 방지)
-            window.location.href = "/client/home";
-          }, 2000);
-          return;
-        }
-
-        // 에러 응답 처리
-        if (data.error && data.error !== "Role already set to different role") {
+        } else if (data.error && data.error !== "Role already set to different role") {
+          // 에러 응답 처리
           console.error("API Error:", data);
           throw new Error(data.error || "Failed to set role");
         }
 
-        // 역할이 이미 설정된 경우도 성공으로 처리
-        console.log("Role already set, treating as success");
+        // 역할 설정 후 클라이언트 레코드 자동 생성
+        console.log("Creating client record...");
+        const createClientResponse = await fetch("/api/clients/auto-create", {
+          method: "POST",
+        });
+
+        if (!createClientResponse.ok) {
+          const createClientData = await createClientResponse.json();
+          console.error("Failed to create client record:", createClientData);
+          // 레코드 생성 실패해도 계속 진행 (이미 존재할 수 있음)
+        } else {
+          console.log("Client record created successfully");
+        }
+
         setStatus("success");
+        // Clerk 세션이 업데이트될 시간을 주고 강제 리다이렉트
         setTimeout(() => {
           // window.location.href를 사용하여 강제 리다이렉트 (무한 루프 방지)
           window.location.href = "/client/home";

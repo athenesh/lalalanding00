@@ -17,6 +17,7 @@ import {
 import { useRouter } from "next/navigation";
 import { SignedOut, SignedIn, useAuth, useUser } from "@clerk/nextjs";
 import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
 
 export default function Home() {
   const router = useRouter();
@@ -109,6 +110,19 @@ export default function Home() {
                 </Button>
               </CardContent>
             </Card>
+          </div>
+
+          {/* 로그인 링크 추가 */}
+          <div className="text-center space-y-2">
+            <p className="text-sm text-muted-foreground">
+              이미 계정이 있으신가요?{" "}
+              <Link
+                href="/sign-in"
+                className="text-primary hover:underline font-medium"
+              >
+                로그인하기
+              </Link>
+            </p>
           </div>
 
           <div className="text-center text-sm text-muted-foreground">

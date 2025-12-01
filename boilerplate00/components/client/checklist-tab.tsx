@@ -5,6 +5,11 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { FileText, Link as LinkIcon, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +18,10 @@ interface ChecklistItem {
   title: string;
   description: string[];
   completed: boolean;
+  notes?: string;
+  referenceUrl?: string;
+  completedAt?: Date;
+  isRequired?: boolean;
 }
 
 interface ChecklistCategory {
@@ -189,6 +198,10 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
     initialData || initialChecklist
   );
   const { toast } = useToast();
+  const [noteDialogOpen, setNoteDialogOpen] = useState<{ categoryId: string; itemId: string } | null>(null);
+  const [urlDialogOpen, setUrlDialogOpen] = useState<{ categoryId: string; itemId: string } | null>(null);
+  const [noteValue, setNoteValue] = useState("");
+  const [urlValue, setUrlValue] = useState("");
 
   // initialData가 변경될 때 checklist 업데이트
   useEffect(() => {
@@ -204,12 +217,91 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
           ? {
               ...category,
               items: category.items.map((item) =>
-                item.id === itemId ? { ...item, completed: !item.completed } : item
+                item.id === itemId
+                  ? {
+                      ...item,
+                      completed: !item.completed,
+                      completedAt: !item.completed ? new Date() : undefined,
+                    }
+                  : item
               ),
             }
           : category
       )
     );
+  };
+
+  const openNoteDialog = (categoryId: string, itemId: string) => {
+    const item = checklist
+      .find((cat) => cat.id === categoryId)
+      ?.items.find((it) => it.id === itemId);
+    setNoteValue(item?.notes || "");
+    setNoteDialogOpen({ categoryId, itemId });
+  };
+
+  const saveNote = () => {
+    if (!noteDialogOpen) return;
+    setChecklist((prev) =>
+      prev.map((category) =>
+        category.id === noteDialogOpen.categoryId
+          ? {
+              ...category,
+              items: category.items.map((item) =>
+                item.id === noteDialogOpen.itemId
+                  ? { ...item, notes: noteValue }
+                  : item
+              ),
+            }
+          : category
+      )
+    );
+    setNoteDialogOpen(null);
+    setNoteValue("");
+    toast({
+      title: "메모 저장 완료",
+      description: "메모가 성공적으로 저장되었습니다.",
+    });
+  };
+
+  const openUrlDialog = (categoryId: string, itemId: string) => {
+    const item = checklist
+      .find((cat) => cat.id === categoryId)
+      ?.items.find((it) => it.id === itemId);
+    setUrlValue(item?.referenceUrl || "");
+    setUrlDialogOpen({ categoryId, itemId });
+  };
+
+  const saveUrl = () => {
+    if (!urlDialogOpen) return;
+    // URL 유효성 검사
+    if (urlValue && !urlValue.match(/^https?:\/\/.+/)) {
+      toast({
+        title: "URL 형식 오류",
+        description: "올바른 URL 형식을 입력해주세요 (http:// 또는 https://로 시작)",
+        variant: "destructive",
+      });
+      return;
+    }
+    setChecklist((prev) =>
+      prev.map((category) =>
+        category.id === urlDialogOpen.categoryId
+          ? {
+              ...category,
+              items: category.items.map((item) =>
+                item.id === urlDialogOpen.itemId
+                  ? { ...item, referenceUrl: urlValue || undefined }
+                  : item
+              ),
+            }
+          : category
+      )
+    );
+    setUrlDialogOpen(null);
+    setUrlValue("");
+    toast({
+      title: "URL 저장 완료",
+      description: "참고 URL이 성공적으로 저장되었습니다.",
+    });
   };
 
   const handleSave = () => {
@@ -286,20 +378,71 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
                           className="mt-1"
                         />
                         <div className="flex-1 space-y-2">
-                          <label
-                            htmlFor={item.id}
-                            className={cn(
-                              "font-medium cursor-pointer",
-                              item.completed && "line-through text-muted-foreground"
+                          <div className="flex items-center gap-2">
+                            <label
+                              htmlFor={item.id}
+                              className={cn(
+                                "font-medium cursor-pointer",
+                                item.completed && "line-through text-muted-foreground"
+                              )}
+                            >
+                              {item.title}
+                            </label>
+                            {item.isRequired && (
+                              <span className="text-xs bg-destructive text-destructive-foreground px-2 py-0.5 rounded">
+                                필수
+                              </span>
                             )}
-                          >
-                            {item.title}
-                          </label>
+                          </div>
                           <div className="space-y-1 text-sm text-muted-foreground">
                             {item.description.map((desc, idx) => (
                               <p key={idx}>{desc}</p>
                             ))}
                           </div>
+                          {item.completed && item.completedAt && (
+                            <p className="text-xs text-muted-foreground">
+                              완료 시간: {item.completedAt.toLocaleString("ko-KR")}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 pt-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openNoteDialog(category.id, item.id)}
+                              className="h-8 gap-1"
+                            >
+                              <FileText className="h-4 w-4" />
+                              {item.notes ? "메모 수정" : "메모 추가"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openUrlDialog(category.id, item.id)}
+                              className="h-8 gap-1"
+                            >
+                              <LinkIcon className="h-4 w-4" />
+                              {item.referenceUrl ? "URL 수정" : "URL 추가"}
+                            </Button>
+                            {item.referenceUrl && (
+                              <a
+                                href={item.referenceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline text-sm flex items-center gap-1"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                링크 열기
+                              </a>
+                            )}
+                          </div>
+                          {item.notes && (
+                            <div className="mt-2 p-2 bg-muted rounded text-sm">
+                              <p className="font-medium mb-1">메모:</p>
+                              <p className="text-muted-foreground whitespace-pre-wrap">{item.notes}</p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -317,6 +460,68 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
           저장하기
         </Button>
       </div>
+
+      {/* 메모 입력 다이얼로그 */}
+      <Dialog
+        open={noteDialogOpen !== null}
+        onOpenChange={(open) => !open && setNoteDialogOpen(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>메모 추가</DialogTitle>
+            <DialogDescription>
+              이 항목에 대한 메모를 입력하세요.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Textarea
+              value={noteValue}
+              onChange={(e) => setNoteValue(e.target.value)}
+              placeholder="메모를 입력하세요..."
+              rows={5}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNoteDialogOpen(null)}>
+              취소
+            </Button>
+            <Button onClick={saveNote}>저장</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* URL 입력 다이얼로그 */}
+      <Dialog
+        open={urlDialogOpen !== null}
+        onOpenChange={(open) => !open && setUrlDialogOpen(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>참고 URL 추가</DialogTitle>
+            <DialogDescription>
+              이 항목과 관련된 참고 링크를 입력하세요.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="url">URL</Label>
+              <Input
+                id="url"
+                type="url"
+                value={urlValue}
+                onChange={(e) => setUrlValue(e.target.value)}
+                placeholder="https://example.com"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUrlDialogOpen(null)}>
+              취소
+            </Button>
+            <Button onClick={saveUrl}>저장</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

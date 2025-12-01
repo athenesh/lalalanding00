@@ -10,9 +10,21 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
-  const { userId, sessionClaims } = await auth();
-  const role = (sessionClaims?.publicMetadata as { role?: string })?.role;
-  const pathname = req.nextUrl.pathname;
+  try {
+    const pathname = req.nextUrl.pathname;
+
+    // 정적 파일 요청은 조기에 반환 (favicon, robots.txt 등)
+    // Next.js가 자동으로 처리하도록 함
+    if (
+      pathname === '/favicon.ico' ||
+      pathname === '/robots.txt' ||
+      pathname === '/sitemap.xml'
+    ) {
+      return NextResponse.next();
+    }
+
+    const { userId, sessionClaims } = await auth();
+    const role = (sessionClaims?.publicMetadata as { role?: string })?.role;
 
   // 로그인한 사용자가 공개 라우트에 접근하는 경우
   if (userId && isPublicRoute(req)) {
@@ -60,6 +72,11 @@ export default clerkMiddleware(async (auth, req) => {
       }
       // role이 없으면 일단 허용하고, 페이지에서 클라이언트 사이드로 체크
     }
+  }
+  } catch (error) {
+    console.error('[Middleware] Error:', error);
+    // 에러 발생 시에도 페이지는 렌더링되도록 함
+    return NextResponse.next();
   }
 });
 
