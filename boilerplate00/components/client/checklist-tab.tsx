@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -178,9 +179,23 @@ const initialChecklist: ChecklistCategory[] = [
   },
 ];
 
-export default function ChecklistTab() {
-  const [checklist, setChecklist] = useState(initialChecklist);
+interface ChecklistTabProps {
+  initialData?: ChecklistCategory[];
+  onSave?: (data: ChecklistCategory[]) => void;
+}
+
+export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps) {
+  const [checklist, setChecklist] = useState<ChecklistCategory[]>(
+    initialData || initialChecklist
+  );
   const { toast } = useToast();
+
+  // initialData가 변경될 때 checklist 업데이트
+  useEffect(() => {
+    if (initialData) {
+      setChecklist(initialData);
+    }
+  }, [initialData]);
 
   const toggleItem = (categoryId: string, itemId: string) => {
     setChecklist((prev) =>
@@ -195,10 +210,13 @@ export default function ChecklistTab() {
           : category
       )
     );
+  };
 
+  const handleSave = () => {
+    onSave?.(checklist);
     toast({
-      title: "체크리스트 업데이트",
-      description: "항목이 업데이트되었습니다.",
+      title: "저장 완료",
+      description: "체크리스트가 성공적으로 저장되었습니다.",
     });
   };
 
@@ -292,6 +310,13 @@ export default function ChecklistTab() {
           );
         })}
       </Accordion>
+
+      {/* 저장 버튼 */}
+      <div className="flex justify-end pt-4">
+        <Button type="button" onClick={handleSave} size="lg">
+          저장하기
+        </Button>
+      </div>
     </div>
   );
 }
