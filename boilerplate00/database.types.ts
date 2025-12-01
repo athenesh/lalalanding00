@@ -312,7 +312,7 @@ export type Database = {
           moving_date: string | null
           name: string
           occupation: string | null
-          owner_agent_id: string
+          owner_agent_id: string | null
           phone_kr: string | null
           phone_us: string | null
           relocation_type: string | null
@@ -326,7 +326,7 @@ export type Database = {
           moving_date?: string | null
           name: string
           occupation?: string | null
-          owner_agent_id: string
+          owner_agent_id?: string | null
           phone_kr?: string | null
           phone_us?: string | null
           relocation_type?: string | null
@@ -340,7 +340,7 @@ export type Database = {
           moving_date?: string | null
           name?: string
           occupation?: string | null
-          owner_agent_id?: string
+          owner_agent_id?: string | null
           phone_kr?: string | null
           phone_us?: string | null
           relocation_type?: string | null

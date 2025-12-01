@@ -71,7 +71,6 @@ export async function PATCH(
       .from("clients")
       .update({
         owner_agent_id: account.id,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", id)
       .select()

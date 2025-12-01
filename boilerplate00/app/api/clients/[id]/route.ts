@@ -127,7 +127,6 @@ export async function PATCH(
         moving_date,
         relocation_type,
         birth_date: birth_date || null,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", id)
       .eq("owner_agent_id", account.id) // 소유권 확인

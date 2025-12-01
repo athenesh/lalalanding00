@@ -30,7 +30,9 @@ interface UnassignedClient {
 
 export default function AgentDashboard() {
   const [clients, setClients] = useState<Client[]>([]);
-  const [unassignedClients, setUnassignedClients] = useState<UnassignedClient[]>([]);
+  const [unassignedClients, setUnassignedClients] = useState<
+    UnassignedClient[]
+  >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingUnassigned, setIsLoadingUnassigned] = useState(true);
   const { toast } = useToast();
@@ -96,6 +98,69 @@ export default function AgentDashboard() {
     }
   }, [router, toast]);
 
+  // 할당되지 않은 클라이언트 목록 로드
+  const loadUnassignedClients = useCallback(async () => {
+    try {
+      setIsLoadingUnassigned(true);
+      console.log("[AgentDashboard] Loading unassigned clients from API...");
+      const response = await fetch("/api/clients/unassigned");
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("[AgentDashboard] Unassigned clients API 호출 실패:", {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData.error,
+          details: errorData.details,
+          code: errorData.code,
+          hint: errorData.hint,
+          fullError: errorData,
+        });
+
+        // 에러 토스트 표시
+        if (response.status === 401 || response.status === 403) {
+          toast({
+            title: "권한 없음",
+            description: "할당되지 않은 클라이언트를 조회할 권한이 없습니다.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        toast({
+          title: "데이터 로드 실패",
+          description:
+            errorData.details ||
+            "할당되지 않은 클라이언트 목록을 불러오는데 실패했습니다.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { clients: unassignedData } = await response.json();
+      console.log(
+        "[AgentDashboard] Unassigned clients loaded:",
+        unassignedData,
+      );
+      setUnassignedClients(unassignedData || []);
+    } catch (error) {
+      console.error(
+        "[AgentDashboard] Error loading unassigned clients:",
+        error,
+      );
+      toast({
+        title: "데이터 로드 실패",
+        description:
+          error instanceof Error
+            ? error.message
+            : "할당되지 않은 클라이언트 목록을 불러오는데 실패했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingUnassigned(false);
+    }
+  }, [toast]);
+
   useEffect(() => {
     if (userLoaded) {
       if (!user) {
@@ -119,38 +184,7 @@ export default function AgentDashboard() {
       loadClients();
       loadUnassignedClients();
     }
-  }, [user, userLoaded, router, toast, loadClients]);
-
-  // 할당되지 않은 클라이언트 목록 로드
-  const loadUnassignedClients = async () => {
-    try {
-      setIsLoadingUnassigned(true);
-      console.log("[AgentDashboard] Loading unassigned clients from API...");
-      const response = await fetch("/api/clients/unassigned");
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error("[AgentDashboard] Unassigned clients API 호출 실패:", {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorData.error,
-          details: errorData.details,
-          code: errorData.code,
-          hint: errorData.hint,
-          fullError: errorData,
-        });
-        return;
-      }
-
-      const { clients: unassignedData } = await response.json();
-      console.log("[AgentDashboard] Unassigned clients loaded:", unassignedData);
-      setUnassignedClients(unassignedData || []);
-    } catch (error) {
-      console.error("[AgentDashboard] Error loading unassigned clients:", error);
-    } finally {
-      setIsLoadingUnassigned(false);
-    }
-  };
+  }, [user, userLoaded, router, toast, loadClients, loadUnassignedClients]);
 
   // 클라이언트 할당 핸들러
   const handleAssignClient = async (clientId: string) => {
@@ -241,7 +275,8 @@ export default function AgentDashboard() {
                     아직 할당된 클라이언트가 없습니다.
                   </p>
                   <p className="text-sm text-muted-foreground mt-2">
-                    아래 &quot;할당 가능한 클라이언트&quot;에서 클라이언트를 할당하세요.
+                    아래 &quot;할당 가능한 클라이언트&quot;에서 클라이언트를
+                    할당하세요.
                   </p>
                 </div>
               )}

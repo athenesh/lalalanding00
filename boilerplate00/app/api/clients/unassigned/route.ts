@@ -65,7 +65,6 @@ export async function GET() {
         relocation_type,
         birth_date,
         created_at,
-        updated_at,
         clerk_user_id
       `,
       )
@@ -120,7 +119,6 @@ export async function GET() {
         relocation_type: client.relocation_type,
         birth_date: client.birth_date,
         created_at: client.created_at,
-        updated_at: client.updated_at,
         clerk_user_id: client.clerk_user_id,
         is_profile_complete: isProfileComplete,
       };

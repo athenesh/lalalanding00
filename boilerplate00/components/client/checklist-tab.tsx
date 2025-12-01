@@ -1,11 +1,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,35 +55,26 @@ const initialChecklist: ChecklistCategory[] = [
         description: [
           "📝 한국에서 국제운전면허증 발급",
           "⚠️ 거주자 판단 기준 확인 (인정 기간: 10일)",
-          "📌 본국 운전면허증과 함께 지참 필수"
+          "📌 본국 운전면허증과 함께 지참 필수",
         ],
         completed: false,
       },
       {
         id: "visa-check",
         title: "비자 확인",
-        description: [
-          "📝 비자 유효기간 확인",
-          "📌 입국 관련 서류 준비"
-        ],
+        description: ["📝 비자 유효기간 확인", "📌 입국 관련 서류 준비"],
         completed: false,
       },
       {
         id: "flight",
         title: "항공권 예약",
-        description: [
-          "📝 입국 일정 확정",
-          "📌 항공권 예약 및 확인"
-        ],
+        description: ["📝 입국 일정 확정", "📌 항공권 예약 및 확인"],
         completed: false,
       },
       {
         id: "packing",
         title: "짐 정리",
-        description: [
-          "📝 필수 물품 준비",
-          "📌 이주 짐 정리"
-        ],
+        description: ["📝 필수 물품 준비", "📌 이주 짐 정리"],
         completed: false,
       },
     ],
@@ -89,7 +92,7 @@ const initialChecklist: ChecklistCategory[] = [
           "💡 Redfin, Zillow로 사전 시세 확인",
           "📋 필요 서류: SSN, 급여명세서, 은행 잔고증명",
           "💰 보증금(Deposit) + 첫 달 렌트 선납",
-          "⏰ Background 체크: 2~3주 소요"
+          "⏰ Background 체크: 2~3주 소요",
         ],
         completed: false,
       },
@@ -99,7 +102,7 @@ const initialChecklist: ChecklistCategory[] = [
         description: [
           "📍 신청 장소: Social Security Office",
           "📋 필요 서류: 여권, 비자, I-94, SS-5 양식",
-          "⏰ 기간: 2~3주 소요 (우편 배달)"
+          "⏰ 기간: 2~3주 소요 (우편 배달)",
         ],
         completed: false,
       },
@@ -111,7 +114,7 @@ const initialChecklist: ChecklistCategory[] = [
           "🏦 주요 은행: Chase, Bank of America, Wells Fargo",
           "📋 필요 서류: 여권, SSN, 거주지 증명",
           "💳 계좌 종류: Saving + Checking 2개",
-          "💰 최소 잔고: $2,000 (Chase 기준)"
+          "💰 최소 잔고: $2,000 (Chase 기준)",
         ],
         completed: false,
       },
@@ -124,7 +127,7 @@ const initialChecklist: ChecklistCategory[] = [
           "🔥 가스: SoCal Gas",
           "📡 인터넷: Spectrum/AT&T/Verizon",
           "🗑️ 쓰레기 수거: EDCO",
-          "💡 청구서는 거주증명으로 활용"
+          "💡 청구서는 거주증명으로 활용",
         ],
         completed: false,
       },
@@ -143,7 +146,7 @@ const initialChecklist: ChecklistCategory[] = [
           "📝 필기 시험: 한국어 선택 가능 (유튜브 공부)",
           "📋 필요 서류: 여권, SSN, 거주지 증명 2개 이상, I-94",
           "🎫 Learner's Permit (임시 면허) 발급",
-          "🚗 실기 시험: DMV 예약, 자차 응시"
+          "🚗 실기 시험: DMV 예약, 자차 응시",
         ],
         completed: false,
       },
@@ -153,7 +156,7 @@ const initialChecklist: ChecklistCategory[] = [
         description: [
           "🚘 신차/중고차(Carmax)",
           "📅 리스 기간: 3년",
-          "📋 필요 서류: 여권, 비자, 운전면허증, I-94, Job Offer"
+          "📋 필요 서류: 여권, 비자, 운전면허증, I-94, Job Offer",
         ],
         completed: false,
       },
@@ -162,26 +165,20 @@ const initialChecklist: ChecklistCategory[] = [
         title: "자동차 보험",
         description: [
           "🏢 보험사: Allstate, State Farm, Farmers, Progressive, GEICO",
-          "💰 초기 보험료: 월 $350"
+          "💰 초기 보험료: 월 $350",
         ],
         completed: false,
       },
       {
         id: "school",
         title: "자녀 학교 등록 (해당 시)",
-        description: [
-          "🏫 거주지 학군 확인",
-          "📋 등록 서류 준비 및 제출"
-        ],
+        description: ["🏫 거주지 학군 확인", "📋 등록 서류 준비 및 제출"],
         completed: false,
       },
       {
         id: "health-insurance",
         title: "의료보험 가입",
-        description: [
-          "🏥 회사 제공 보험 확인",
-          "📋 개인 보험 가입 (필요 시)"
-        ],
+        description: ["🏥 회사 제공 보험 확인", "📋 개인 보험 가입 (필요 시)"],
         completed: false,
       },
     ],
@@ -193,13 +190,22 @@ interface ChecklistTabProps {
   onSave?: (data: ChecklistCategory[]) => void;
 }
 
-export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps) {
+export default function ChecklistTab({
+  initialData,
+  onSave,
+}: ChecklistTabProps) {
   const [checklist, setChecklist] = useState<ChecklistCategory[]>(
-    initialData || initialChecklist
+    initialData || initialChecklist,
   );
   const { toast } = useToast();
-  const [noteDialogOpen, setNoteDialogOpen] = useState<{ categoryId: string; itemId: string } | null>(null);
-  const [urlDialogOpen, setUrlDialogOpen] = useState<{ categoryId: string; itemId: string } | null>(null);
+  const [noteDialogOpen, setNoteDialogOpen] = useState<{
+    categoryId: string;
+    itemId: string;
+  } | null>(null);
+  const [urlDialogOpen, setUrlDialogOpen] = useState<{
+    categoryId: string;
+    itemId: string;
+  } | null>(null);
   const [noteValue, setNoteValue] = useState("");
   const [urlValue, setUrlValue] = useState("");
 
@@ -223,11 +229,11 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
                       completed: !item.completed,
                       completedAt: !item.completed ? new Date() : undefined,
                     }
-                  : item
+                  : item,
               ),
             }
-          : category
-      )
+          : category,
+      ),
     );
   };
 
@@ -249,11 +255,11 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
               items: category.items.map((item) =>
                 item.id === noteDialogOpen.itemId
                   ? { ...item, notes: noteValue }
-                  : item
+                  : item,
               ),
             }
-          : category
-      )
+          : category,
+      ),
     );
     setNoteDialogOpen(null);
     setNoteValue("");
@@ -277,7 +283,8 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
     if (urlValue && !urlValue.match(/^https?:\/\/.+/)) {
       toast({
         title: "URL 형식 오류",
-        description: "올바른 URL 형식을 입력해주세요 (http:// 또는 https://로 시작)",
+        description:
+          "올바른 URL 형식을 입력해주세요 (http:// 또는 https://로 시작)",
         variant: "destructive",
       });
       return;
@@ -290,11 +297,11 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
               items: category.items.map((item) =>
                 item.id === urlDialogOpen.itemId
                   ? { ...item, referenceUrl: urlValue || undefined }
-                  : item
+                  : item,
               ),
             }
-          : category
-      )
+          : category,
+      ),
     );
     setUrlDialogOpen(null);
     setUrlValue("");
@@ -315,7 +322,7 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
   const totalItems = checklist.reduce((sum, cat) => sum + cat.items.length, 0);
   const completedItems = checklist.reduce(
     (sum, cat) => sum + cat.items.filter((item) => item.completed).length,
-    0
+    0,
   );
   const completionPercentage = Math.round((completedItems / totalItems) * 100);
 
@@ -324,7 +331,9 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
       <div className="bg-card rounded-lg border border-border p-6 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">전체 진행률</h3>
-          <span className="text-2xl font-bold text-primary">{completionPercentage}%</span>
+          <span className="text-2xl font-bold text-primary">
+            {completionPercentage}%
+          </span>
         </div>
         <Progress value={completionPercentage} className="h-3" />
         <p className="text-sm text-muted-foreground">
@@ -332,11 +341,19 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
         </p>
       </div>
 
-      <Accordion type="multiple" defaultValue={["pre-departure", "arrival", "settlement"]} className="space-y-4">
+      <Accordion
+        type="multiple"
+        defaultValue={["pre-departure", "arrival", "settlement"]}
+        className="space-y-4"
+      >
         {checklist.map((category) => {
-          const categoryCompleted = category.items.filter((item) => item.completed).length;
+          const categoryCompleted = category.items.filter(
+            (item) => item.completed,
+          ).length;
           const categoryTotal = category.items.length;
-          const categoryPercentage = Math.round((categoryCompleted / categoryTotal) * 100);
+          const categoryPercentage = Math.round(
+            (categoryCompleted / categoryTotal) * 100,
+          );
 
           return (
             <AccordionItem
@@ -355,7 +372,9 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
                       </p>
                     </div>
                   </div>
-                  <div className="text-sm font-semibold text-primary">{categoryPercentage}%</div>
+                  <div className="text-sm font-semibold text-primary">
+                    {categoryPercentage}%
+                  </div>
                 </div>
               </AccordionTrigger>
               <AccordionContent className="px-6 pb-4">
@@ -367,14 +386,16 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
                         "p-4 rounded-lg border transition-colors",
                         item.completed
                           ? "bg-success/10 border-success/20"
-                          : "bg-background border-border"
+                          : "bg-background border-border",
                       )}
                     >
                       <div className="flex items-start gap-3">
                         <Checkbox
                           id={item.id}
                           checked={item.completed}
-                          onCheckedChange={() => toggleItem(category.id, item.id)}
+                          onCheckedChange={() =>
+                            toggleItem(category.id, item.id)
+                          }
                           className="mt-1"
                         />
                         <div className="flex-1 space-y-2">
@@ -383,7 +404,8 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
                               htmlFor={item.id}
                               className={cn(
                                 "font-medium cursor-pointer",
-                                item.completed && "line-through text-muted-foreground"
+                                item.completed &&
+                                  "line-through text-muted-foreground",
                               )}
                             >
                               {item.title}
@@ -401,7 +423,8 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
                           </div>
                           {item.completed && item.completedAt && (
                             <p className="text-xs text-muted-foreground">
-                              완료 시간: {item.completedAt.toLocaleString("ko-KR")}
+                              완료 시간:{" "}
+                              {item.completedAt.toLocaleString("ko-KR")}
                             </p>
                           )}
                           <div className="flex items-center gap-2 pt-2">
@@ -409,7 +432,9 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
                               type="button"
                               variant="ghost"
                               size="sm"
-                              onClick={() => openNoteDialog(category.id, item.id)}
+                              onClick={() =>
+                                openNoteDialog(category.id, item.id)
+                              }
                               className="h-8 gap-1"
                             >
                               <FileText className="h-4 w-4" />
@@ -419,7 +444,9 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
                               type="button"
                               variant="ghost"
                               size="sm"
-                              onClick={() => openUrlDialog(category.id, item.id)}
+                              onClick={() =>
+                                openUrlDialog(category.id, item.id)
+                              }
                               className="h-8 gap-1"
                             >
                               <LinkIcon className="h-4 w-4" />
@@ -440,7 +467,9 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
                           {item.notes && (
                             <div className="mt-2 p-2 bg-muted rounded text-sm">
                               <p className="font-medium mb-1">메모:</p>
-                              <p className="text-muted-foreground whitespace-pre-wrap">{item.notes}</p>
+                              <p className="text-muted-foreground whitespace-pre-wrap">
+                                {item.notes}
+                              </p>
                             </div>
                           )}
                         </div>
@@ -525,4 +554,3 @@ export default function ChecklistTab({ initialData, onSave }: ChecklistTabProps)
     </div>
   );
 }
-

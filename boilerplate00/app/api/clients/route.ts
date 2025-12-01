@@ -64,7 +64,6 @@ export async function GET() {
         occupation,
         moving_date,
         created_at,
-        updated_at,
         checklist_items (
           id,
           is_completed
@@ -117,7 +116,6 @@ export async function GET() {
         occupation: client.occupation,
         moving_date: client.moving_date,
         created_at: client.created_at,
-        updated_at: client.updated_at,
         checklist_completion_rate: Math.round(completionRate),
         checklist_total: totalItems,
         checklist_completed: completedItems,
