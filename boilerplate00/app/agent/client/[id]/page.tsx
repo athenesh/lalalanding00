@@ -21,7 +21,10 @@ interface ClientProfileData {
   occupation: string;
   movingDate: string; // YYYY-MM-DD 형식
   relocationType: string;
+  movingType?: string;
   birthDate: string | null; // YYYY-MM-DD 형식 또는 null
+  familyMembers?: any[];
+  emergencyContacts?: any[];
 }
 
 interface HousingData {
@@ -252,22 +255,47 @@ export default function AgentClientDetailPage() {
           throw new Error("Failed to load client data");
         }
 
-        const { client } = await response.json();
+        const { client, familyMembers, emergencyContacts } = await response.json();
 
         // 클라이언트 데이터 로드 성공 로그
         console.log("[ClientDetail] 클라이언트 데이터 로드 성공:", {
           clientId,
           clientName: client.name,
+          familyMembersCount: familyMembers?.length || 0,
+          emergencyContactsCount: emergencyContacts?.length || 0,
         });
+
+        // 프로필 데이터 변환
+        const transformedFamilyMembers = (familyMembers || []).map((member: any) => ({
+          id: member.id,
+          name: member.name,
+          relationship: member.relationship,
+          birthDate: member.birth_date ? new Date(member.birth_date) : undefined,
+          phone: member.phone || "",
+          email: member.email || "",
+          notes: member.notes || "",
+        }));
+
+        const transformedEmergencyContacts = (emergencyContacts || []).map((contact: any) => ({
+          id: contact.id,
+          name: contact.name,
+          relationship: contact.relationship,
+          phoneKr: contact.phone_kr || "",
+          email: contact.email || "",
+          kakaoId: contact.kakao_id || "",
+        }));
 
         setClientProfile({
           name: client.name,
           email: client.email,
-          phone: client.phone || "",
+          phone: client.phone_kr || client.phone_us || "",
           occupation: client.occupation,
           movingDate: client.moving_date,
           relocationType: client.relocation_type || "",
+          movingType: client.moving_type || "",
           birthDate: client.birth_date || null,
+          familyMembers: transformedFamilyMembers,
+          emergencyContacts: transformedEmergencyContacts,
         });
       } catch (error) {
         console.error("[ClientDetail] 클라이언트 데이터 로드 실패:", error);
@@ -480,15 +508,7 @@ export default function AgentClientDetailPage() {
   }, [clientId]);
 
   // 프로필 저장 핸들러 (API 호출)
-  const handleSaveProfile = async (data: {
-    name: string;
-    email: string;
-    phone: string;
-    occupation: string;
-    movingDate: Date | undefined;
-    relocationType: string;
-    birthDate: Date | undefined;
-  }) => {
+  const handleSaveProfile = async (data: any) => {
     try {
       setIsSaving(true);
 
@@ -499,7 +519,23 @@ export default function AgentClientDetailPage() {
         occupation: data.occupation,
         moving_date: data.movingDate?.toISOString().split("T")[0],
         relocation_type: data.relocationType,
+        moving_type: data.movingType,
         birth_date: data.birthDate?.toISOString().split("T")[0] || null,
+        family_members: data.familyMembers?.map((member: any) => ({
+          name: member.name,
+          relationship: member.relationship,
+          birthDate: member.birthDate,
+          phone: member.phone,
+          email: member.email,
+          notes: member.notes,
+        })) || [],
+        emergency_contacts: data.emergencyContacts?.map((contact: any) => ({
+          name: contact.name,
+          relationship: contact.relationship,
+          phoneKr: contact.phoneKr,
+          email: contact.email,
+          kakaoId: contact.kakaoId,
+        })) || [],
       };
 
       // API 호출 시작 로그
@@ -541,6 +577,9 @@ export default function AgentClientDetailPage() {
         relocationType: client.relocation_type || "",
         birthDate: client.birth_date || null,
       });
+
+      // 프로필 데이터 다시 로드
+      // loadClientData는 useEffect에서 자동으로 호출되므로 여기서는 호출하지 않음
 
       toast({
         title: "저장 완료",
@@ -816,9 +855,12 @@ export default function AgentClientDetailPage() {
                       occupation: clientProfile.occupation,
                       movingDate: new Date(clientProfile.movingDate),
                       relocationType: clientProfile.relocationType,
+                      movingType: clientProfile.movingType || "",
                       birthDate: clientProfile.birthDate
                         ? new Date(clientProfile.birthDate)
                         : undefined,
+                      familyMembers: clientProfile.familyMembers || [],
+                      emergencyContacts: clientProfile.emergencyContacts || [],
                     }}
                     onSave={handleSaveProfile}
                     isSaving={isSaving}

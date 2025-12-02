@@ -1,45 +1,36 @@
 import { NextResponse } from "next/server";
-import { requireAgent, getOrCreateAccount } from "@/lib/auth";
+import { getAuthUserId, requireClient } from "@/lib/auth";
 import { createClerkSupabaseClient } from "@/lib/supabase/server";
 
 /**
- * GET /api/clients/[id]
- * 클라이언트 상세 정보를 조회합니다.
+ * GET /api/client/profile
+ * 클라이언트 자신의 프로필 정보를 조회합니다.
  */
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET() {
   try {
-    const { id } = await params;
-    // API 호출 시작 로그
-    console.log("[API] GET /api/clients/[id] 호출:", { clientId: id });
+    console.log("[API] GET /api/client/profile 호출");
 
-    // 에이전트 권한 확인
-    await requireAgent();
+    // 클라이언트 권한 확인
+    await requireClient();
 
+    const userId = await getAuthUserId();
     const supabase = createClerkSupabaseClient();
 
-    // Account 조회 또는 자동 생성
-    const account = await getOrCreateAccount();
-
-    // 클라이언트 상세 정보 조회 (소유권 확인)
+    // 클라이언트 정보 조회 (clerk_user_id로)
     const { data: client, error: clientError } = await supabase
       .from("clients")
       .select("*")
-      .eq("id", id)
-      .eq("owner_agent_id", account.id)
+      .eq("clerk_user_id", userId)
       .single();
 
     if (clientError) {
       console.error("[API] Client fetch error:", {
-        clientId: id,
-        accountId: account.id,
+        userId,
         error: clientError,
       });
       if (clientError.code === "PGRST116") {
         // 클라이언트를 찾을 수 없음
-        console.warn("[API] Client not found:", { clientId: id });
+        console.warn("[API] Client not found:", { userId });
         return NextResponse.json(
           { error: "Client not found" },
           { status: 404 }
@@ -55,7 +46,7 @@ export async function GET(
     const { data: familyMembers, error: familyError } = await supabase
       .from("family_members")
       .select("*")
-      .eq("client_id", id);
+      .eq("client_id", client.id);
 
     if (familyError) {
       console.error("[API] Failed to fetch family members:", familyError);
@@ -65,15 +56,14 @@ export async function GET(
     const { data: emergencyContacts, error: emergencyError } = await supabase
       .from("emergency_contacts")
       .select("*")
-      .eq("client_id", id);
+      .eq("client_id", client.id);
 
     if (emergencyError) {
       console.error("[API] Failed to fetch emergency contacts:", emergencyError);
     }
 
-    console.log("[API] Client 조회 성공:", {
-      clientId: id,
-      clientName: client.name,
+    console.log("[API] Client profile 조회 성공:", {
+      clientId: client.id,
       familyMembersCount: familyMembers?.length || 0,
       emergencyContactsCount: emergencyContacts?.length || 0,
     });
@@ -84,9 +74,7 @@ export async function GET(
       emergencyContacts: emergencyContacts || [],
     });
   } catch (error) {
-    const { id } = await params;
-    console.error("[API] Error in GET /api/clients/[id]:", {
-      clientId: id,
+    console.error("[API] Error in GET /api/client/profile:", {
       error,
     });
     return NextResponse.json(
@@ -97,25 +85,33 @@ export async function GET(
 }
 
 /**
- * PATCH /api/clients/[id]
- * 클라이언트 정보를 수정합니다.
+ * PATCH /api/client/profile
+ * 클라이언트 자신의 프로필 정보를 수정합니다.
  */
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: Request) {
   try {
-    const { id } = await params;
-    // API 호출 시작 로그
-    console.log("[API] PATCH /api/clients/[id] 호출:", { clientId: id });
+    console.log("[API] PATCH /api/client/profile 호출");
 
-    // 에이전트 권한 확인
-    await requireAgent();
+    // 클라이언트 권한 확인
+    await requireClient();
 
+    const userId = await getAuthUserId();
     const supabase = createClerkSupabaseClient();
 
-    // Account 조회 또는 자동 생성
-    const account = await getOrCreateAccount();
+    // 클라이언트 정보 조회 (clerk_user_id로)
+    const { data: existingClient, error: fetchError } = await supabase
+      .from("clients")
+      .select("id")
+      .eq("clerk_user_id", userId)
+      .single();
+
+    if (fetchError || !existingClient) {
+      console.error("[API] Client not found:", { userId, error: fetchError });
+      return NextResponse.json(
+        { error: "Client not found" },
+        { status: 404 }
+      );
+    }
 
     const body = await request.json();
     const {
@@ -134,7 +130,7 @@ export async function PATCH(
     // 유효성 검사
     if (!name || !email || !occupation || !moving_date || !relocation_type) {
       console.warn("[API] Missing required fields:", {
-        clientId: id,
+        clientId: existingClient.id,
         body,
       });
       return NextResponse.json(
@@ -143,8 +139,8 @@ export async function PATCH(
       );
     }
 
-    console.log("[API] 클라이언트 업데이트 데이터:", {
-      clientId: id,
+    console.log("[API] 클라이언트 프로필 업데이트 데이터:", {
+      clientId: existingClient.id,
       name,
       email,
       occupation,
@@ -181,38 +177,37 @@ export async function PATCH(
     }
 
     console.log("[API] 클라이언트 업데이트 데이터 (최종):", {
-      clientId: id,
+      clientId: existingClient.id,
       updateData,
     });
 
-    // 클라이언트 업데이트 (소유권 확인)
+    // 클라이언트 업데이트
     const { data: client, error: clientError } = await supabase
       .from("clients")
       .update(updateData)
-      .eq("id", id)
-      .eq("owner_agent_id", account.id) // 소유권 확인
+      .eq("id", existingClient.id)
       .select()
       .single();
 
     if (clientError) {
       console.error("[API] Client update error:", {
-        clientId: id,
-        accountId: account.id,
+        clientId: existingClient.id,
         error: clientError,
         errorCode: clientError.code,
         errorMessage: clientError.message,
         errorDetails: clientError.details,
         errorHint: clientError.hint,
-        updateData,
+        updateData: {
+          name,
+          email,
+          phone_kr: phone || null,
+          occupation,
+          moving_date,
+          relocation_type,
+          moving_type: moving_type || null,
+          birth_date: birth_date || null,
+        },
       });
-      if (clientError.code === "PGRST116") {
-        // 클라이언트를 찾을 수 없음
-        console.warn("[API] Client not found for update:", { clientId: id });
-        return NextResponse.json(
-          { error: "Client not found" },
-          { status: 404 }
-        );
-      }
       return NextResponse.json(
         {
           error: "Failed to update client",
@@ -229,7 +224,7 @@ export async function PATCH(
       const { error: deleteFamilyError } = await supabase
         .from("family_members")
         .delete()
-        .eq("client_id", id);
+        .eq("client_id", existingClient.id);
 
       if (deleteFamilyError) {
         console.error("[API] Failed to delete family members:", deleteFamilyError);
@@ -251,7 +246,7 @@ export async function PATCH(
               }
             }
             return {
-              client_id: id,
+              client_id: existingClient.id,
               name: member.name,
               relationship: member.relationship,
               birth_date: birthDate,
@@ -269,7 +264,7 @@ export async function PATCH(
             console.error("[API] Failed to insert family members:", insertFamilyError);
           } else {
             console.log("[API] Family members updated:", {
-              clientId: id,
+              clientId: existingClient.id,
               count: family_members.length,
             });
           }
@@ -283,7 +278,7 @@ export async function PATCH(
       const { error: deleteEmergencyError } = await supabase
         .from("emergency_contacts")
         .delete()
-        .eq("client_id", id);
+        .eq("client_id", existingClient.id);
 
       if (deleteEmergencyError) {
         console.error("[API] Failed to delete emergency contacts:", deleteEmergencyError);
@@ -291,7 +286,7 @@ export async function PATCH(
         // 새 비상연락망 추가
         if (emergency_contacts.length > 0) {
           const emergencyData = emergency_contacts.map((contact: any) => ({
-            client_id: id,
+            client_id: existingClient.id,
             name: contact.name,
             relationship: contact.relationship,
             phone_kr: contact.phoneKr || null,
@@ -307,7 +302,7 @@ export async function PATCH(
             console.error("[API] Failed to insert emergency contacts:", insertEmergencyError);
           } else {
             console.log("[API] Emergency contacts updated:", {
-              clientId: id,
+              clientId: existingClient.id,
               count: emergency_contacts.length,
             });
           }
@@ -315,36 +310,14 @@ export async function PATCH(
       }
     }
 
-    if (clientError) {
-      console.error("[API] Client update error:", {
-        clientId: id,
-        accountId: account.id,
-        error: clientError,
-      });
-      if (clientError.code === "PGRST116") {
-        // 클라이언트를 찾을 수 없음
-        console.warn("[API] Client not found for update:", { clientId: id });
-        return NextResponse.json(
-          { error: "Client not found" },
-          { status: 404 }
-        );
-      }
-      return NextResponse.json(
-        { error: "Failed to update client" },
-        { status: 500 }
-      );
-    }
-
-    console.log("[API] Client 업데이트 성공:", {
-      clientId: id,
+    console.log("[API] Client profile 업데이트 성공:", {
+      clientId: existingClient.id,
       clientName: client.name,
     });
 
     return NextResponse.json({ client });
   } catch (error) {
-    const { id } = await params;
-    console.error("[API] Error in PATCH /api/clients/[id]:", {
-      clientId: id,
+    console.error("[API] Error in PATCH /api/client/profile:", {
       error,
     });
     return NextResponse.json(
