@@ -26,7 +26,11 @@ export default function ClientHomePage() {
     checklistCompletion: 0,
   });
   const [profileData, setProfileData] = useState<any>(null);
+  const [housingData, setHousingData] = useState<any>(null);
+  const [checklistData, setChecklistData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingHousing, setIsLoadingHousing] = useState(false);
+  const [isLoadingChecklist, setIsLoadingChecklist] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // 클라이언트 역할 체크 및 프로필 데이터 로드
@@ -54,6 +58,10 @@ export default function ClientHomePage() {
 
     // 프로필 데이터 로드
     loadProfileData();
+    // 주거옵션 데이터 로드
+    loadHousingData();
+    // 체크리스트 데이터 로드
+    loadChecklistData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, user, authLoaded, userLoaded, router]);
 
@@ -97,21 +105,25 @@ export default function ClientHomePage() {
         notes: member.notes || "",
       }));
 
-      const transformedEmergencyContacts = emergencyContacts.map((contact: any) => ({
-        id: contact.id,
-        name: contact.name,
-        relationship: contact.relationship,
-        phoneKr: contact.phone_kr || "",
-        email: contact.email || "",
-        kakaoId: contact.kakao_id || "",
-      }));
+      const transformedEmergencyContacts = emergencyContacts.map(
+        (contact: any) => ({
+          id: contact.id,
+          name: contact.name,
+          relationship: contact.relationship,
+          phoneKr: contact.phone_kr || "",
+          email: contact.email || "",
+          kakaoId: contact.kakao_id || "",
+        }),
+      );
 
       setProfileData({
         name: client.name || "",
         email: client.email || "",
         phone: client.phone_kr || client.phone_us || "",
         occupation: client.occupation || "",
-        movingDate: client.moving_date ? new Date(client.moving_date) : undefined,
+        movingDate: client.moving_date
+          ? new Date(client.moving_date)
+          : undefined,
         relocationType: client.relocation_type || "",
         movingType: client.moving_type || "",
         birthDate: client.birth_date ? new Date(client.birth_date) : undefined,
@@ -127,6 +139,301 @@ export default function ClientHomePage() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadHousingData = async () => {
+    try {
+      setIsLoadingHousing(true);
+      console.log("[ClientHomePage] 주거옵션 데이터 로드 시작");
+
+      const response = await fetch("/api/client/housing");
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log("[ClientHomePage] 주거옵션이 아직 생성되지 않음");
+          setHousingData(null);
+          setIsLoadingHousing(false);
+          return;
+        }
+        throw new Error("Failed to load housing data");
+      }
+
+      const { housing } = await response.json();
+
+      if (housing) {
+        // DB 필드명 → UI 필드명 변환
+        // housing_type이 배열이 아닌 경우 배열로 변환 (기존 데이터 호환성)
+        let housingTypeArray: string[] = [];
+        if (housing.housing_type) {
+          if (Array.isArray(housing.housing_type)) {
+            housingTypeArray = housing.housing_type;
+          } else {
+            // 단일 값인 경우 배열로 변환
+            housingTypeArray = [housing.housing_type];
+          }
+        }
+
+        // parking_count를 문자열로 변환 (4+ 같은 경우 처리)
+        let parkingCountStr = "";
+        if (
+          housing.parking_count !== null &&
+          housing.parking_count !== undefined
+        ) {
+          if (housing.parking_count >= 4) {
+            parkingCountStr = "4+";
+          } else {
+            parkingCountStr = housing.parking_count.toString();
+          }
+        }
+
+        setHousingData({
+          preferredArea: housing.preferred_city || "",
+          maxBudget: housing.budget_max?.toString() || "",
+          housingType: housingTypeArray,
+          bedrooms: housing.bedrooms?.toString() || "2",
+          bathrooms: housing.bathrooms?.toString() || "2",
+          furnished: housing.furnished ?? false,
+          hasWasherDryer: housing.has_washer_dryer ?? false,
+          parking: housing.parking ?? false,
+          parkingCount: parkingCountStr,
+          hasPets: housing.has_pets ?? false,
+          petDetails: housing.pet_details || "",
+          schoolDistrict: housing.school_district ?? false,
+          workplaceAddress: housing.workplace_address || "",
+          additionalNotes: housing.additional_notes || "",
+        });
+      } else {
+        setHousingData(null);
+      }
+
+      console.log("[ClientHomePage] 주거옵션 데이터 로드 성공");
+    } catch (error) {
+      console.error("[ClientHomePage] 주거옵션 데이터 로드 실패:", error);
+      toast({
+        title: "데이터 로드 실패",
+        description: "주거옵션 정보를 불러오는데 실패했습니다.",
+        variant: "destructive",
+      });
+      setHousingData(null);
+    } finally {
+      setIsLoadingHousing(false);
+    }
+  };
+
+  const loadChecklistData = async () => {
+    try {
+      setIsLoadingChecklist(true);
+      console.log("[ClientHomePage] 체크리스트 데이터 로드 시작");
+
+      const response = await fetch("/api/client/checklist");
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log("[ClientHomePage] 체크리스트가 아직 생성되지 않음");
+          setChecklistData([]);
+          setIsLoadingChecklist(false);
+          return;
+        }
+        throw new Error("Failed to load checklist data");
+      }
+
+      const { checklist } = await response.json();
+
+      if (checklist && checklist.length > 0) {
+        // API에서 이미 ChecklistItem 형식으로 변환되어 반환됨
+        setChecklistData(checklist);
+      } else {
+        setChecklistData([]);
+      }
+
+      console.log("[ClientHomePage] 체크리스트 데이터 로드 성공:", {
+        itemCount: checklist?.length || 0,
+      });
+    } catch (error) {
+      console.error("[ClientHomePage] 체크리스트 데이터 로드 실패:", error);
+      toast({
+        title: "데이터 로드 실패",
+        description: "체크리스트 정보를 불러오는데 실패했습니다.",
+        variant: "destructive",
+      });
+      setChecklistData([]);
+    } finally {
+      setIsLoadingChecklist(false);
+    }
+  };
+
+  const handleSaveChecklist = async (items: any[]) => {
+    try {
+      setIsSaving(true);
+      console.log("[ClientHomePage] 체크리스트 저장 시작:", {
+        itemCount: items.length,
+      });
+
+      // ChecklistItem을 DB 업데이트 형식으로 변환
+      const itemsToUpdate = items.map((item: any) => ({
+        id: item.id || undefined,
+        title: item.title,
+        phase: item.phase, // TimelinePhase enum 값
+        category: item.category, // sub_category
+        description: item.description, // ChecklistItemContent[] 배열
+        isCompleted: item.isCompleted || false,
+        memo: item.memo || "",
+        referenceUrl: item.referenceUrl || null,
+        completedAt: item.completedAt
+          ? item.completedAt instanceof Date
+            ? item.completedAt.toISOString()
+            : item.completedAt
+          : null,
+        orderNum: item.orderNum || 0,
+        isRequired: item.isRequired || false,
+      }));
+
+      console.log("[ClientHomePage] 체크리스트 업데이트 항목:", {
+        itemCount: itemsToUpdate.length,
+        itemsWithId: itemsToUpdate.filter((item) => item.id).length,
+      });
+
+      let response: Response;
+      try {
+        response = await fetch("/api/client/checklist", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: itemsToUpdate,
+          }),
+        });
+      } catch (fetchError) {
+        console.error("[ClientHomePage] 네트워크 에러:", fetchError);
+        throw new Error(
+          "서버에 연결할 수 없습니다. 개발 서버가 실행 중인지 확인해주세요.",
+        );
+      }
+
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { error: `HTTP ${response.status} 에러` };
+        }
+        console.error("[ClientHomePage] 체크리스트 저장 실패:", {
+          status: response.status,
+          error: errorData.error,
+        });
+        throw new Error(errorData.error || "Failed to update checklist");
+      }
+
+      const { updated } = await response.json();
+
+      // 데이터 다시 로드하여 최신 상태 반영
+      await loadChecklistData();
+
+      console.log("[ClientHomePage] 체크리스트 저장 성공:", {
+        updatedCount: updated.length,
+      });
+
+      toast({
+        title: "저장 완료",
+        description: "체크리스트가 성공적으로 저장되었습니다.",
+      });
+    } catch (error) {
+      console.error("[ClientHomePage] 체크리스트 저장 오류:", error);
+      toast({
+        title: "저장 실패",
+        description:
+          error instanceof Error
+            ? error.message
+            : "체크리스트 저장에 실패했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveHousing = async (data: any) => {
+    try {
+      setIsSaving(true);
+      console.log("[ClientHomePage] 주거옵션 저장 시작:", data);
+
+      const response = await fetch("/api/client/housing", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("[ClientHomePage] 주거옵션 저장 실패:", {
+          status: response.status,
+          error: errorData.error,
+        });
+        throw new Error(
+          errorData.error || "Failed to update housing requirements",
+        );
+      }
+
+      const { housing } = await response.json();
+
+      // 로컬 상태 업데이트 (DB 필드명 → UI 필드명 변환)
+      // housing_type이 배열이 아닌 경우 배열로 변환 (기존 데이터 호환성)
+      let housingTypeArray: string[] = [];
+      if (housing.housing_type) {
+        if (Array.isArray(housing.housing_type)) {
+          housingTypeArray = housing.housing_type;
+        } else {
+          // 단일 값인 경우 배열로 변환
+          housingTypeArray = [housing.housing_type];
+        }
+      }
+
+      // parking_count를 문자열로 변환 (4+ 같은 경우 처리)
+      let parkingCountStr = "";
+      if (
+        housing.parking_count !== null &&
+        housing.parking_count !== undefined
+      ) {
+        if (housing.parking_count >= 4) {
+          parkingCountStr = "4+";
+        } else {
+          parkingCountStr = housing.parking_count.toString();
+        }
+      }
+
+      setHousingData({
+        preferredArea: housing.preferred_city || "",
+        maxBudget: housing.budget_max?.toString() || "",
+        housingType: housingTypeArray,
+        bedrooms: housing.bedrooms?.toString() || "2",
+        bathrooms: housing.bathrooms?.toString() || "2",
+        furnished: housing.furnished ?? false,
+        hasWasherDryer: housing.has_washer_dryer ?? false,
+        parking: housing.parking ?? false,
+        parkingCount: parkingCountStr,
+        hasPets: housing.has_pets ?? false,
+        petDetails: housing.pet_details || "",
+        schoolDistrict: housing.school_district ?? false,
+        workplaceAddress: housing.workplace_address || "",
+        additionalNotes: housing.additional_notes || "",
+      });
+
+      console.log("[ClientHomePage] 주거옵션 저장 성공");
+
+      toast({
+        title: "저장 완료",
+        description: "주거옵션이 성공적으로 저장되었습니다.",
+      });
+    } catch (error) {
+      console.error("[ClientHomePage] 주거옵션 저장 오류:", error);
+      toast({
+        title: "저장 실패",
+        description:
+          error instanceof Error
+            ? error.message
+            : "주거옵션 저장에 실패했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -160,13 +467,15 @@ export default function ClientHomePage() {
 
       // 비상연락망이 있으면 추가
       if (data.emergencyContacts && data.emergencyContacts.length > 0) {
-        requestBody.emergency_contacts = data.emergencyContacts.map((contact: any) => ({
-          name: contact.name,
-          relationship: contact.relationship,
-          phoneKr: contact.phoneKr,
-          email: contact.email,
-          kakaoId: contact.kakaoId,
-        }));
+        requestBody.emergency_contacts = data.emergencyContacts.map(
+          (contact: any) => ({
+            name: contact.name,
+            relationship: contact.relationship,
+            phoneKr: contact.phoneKr,
+            email: contact.email,
+            kakaoId: contact.kakaoId,
+          }),
+        );
       }
 
       const response = await fetch("/api/client/profile", {
@@ -183,7 +492,9 @@ export default function ClientHomePage() {
           details: errorData.details,
           code: errorData.code,
         });
-        throw new Error(errorData.details || errorData.error || "Failed to update profile");
+        throw new Error(
+          errorData.details || errorData.error || "Failed to update profile",
+        );
       }
 
       const { client } = await response.json();
@@ -208,7 +519,10 @@ export default function ClientHomePage() {
       console.error("[ClientHomePage] 프로필 저장 오류:", error);
       toast({
         title: "저장 실패",
-        description: error instanceof Error ? error.message : "프로필 저장에 실패했습니다.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "프로필 저장에 실패했습니다.",
         variant: "destructive",
       });
     } finally {
@@ -277,7 +591,9 @@ export default function ClientHomePage() {
               <TabsContent value="profile" className="space-y-6">
                 {isLoading ? (
                   <div className="text-center py-8">
-                    <p className="text-muted-foreground">프로필 정보를 불러오는 중...</p>
+                    <p className="text-muted-foreground">
+                      프로필 정보를 불러오는 중...
+                    </p>
                   </div>
                 ) : (
                   <ProfileTab
@@ -291,20 +607,23 @@ export default function ClientHomePage() {
               <TabsContent value="housing" className="space-y-6">
                 <div className="bg-card rounded-lg border border-border p-6">
                   <h2 className="text-xl font-semibold mb-6">주거 옵션</h2>
-                  <HousingTab
-                    initialData={{
-                      preferredArea: "로스앤젤레스, CA",
-                      maxBudget: "3000",
-                      housingType: "apartment",
-                      bedrooms: "2",
-                      bathrooms: "2",
-                    }}
-                  />
+                  {isLoadingHousing ? (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">
+                        주거옵션 정보를 불러오는 중...
+                      </p>
+                    </div>
+                  ) : (
+                    <HousingTab
+                      initialData={housingData}
+                      onSave={handleSaveHousing}
+                    />
+                  )}
                 </div>
               </TabsContent>
 
               <TabsContent value="checklist" className="space-y-6">
-                <ChecklistTab />
+                <ChecklistTab movingDate={clientData.movingDate} />
               </TabsContent>
 
               <TabsContent value="chat" className="space-y-6">

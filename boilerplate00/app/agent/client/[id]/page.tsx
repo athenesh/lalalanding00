@@ -30,12 +30,13 @@ interface ClientProfileData {
 interface HousingData {
   preferredArea: string;
   maxBudget: string;
-  housingType: string;
+  housingType: string[];
   bedrooms: string;
   bathrooms: string;
   furnished: boolean;
   hasWasherDryer: boolean;
   parking: boolean;
+  parkingCount: string;
   hasPets: boolean;
   petDetails: string;
   schoolDistrict: boolean;
@@ -335,7 +336,7 @@ export default function AgentClientDetailPage() {
             setHousingData({
               preferredArea: "",
               maxBudget: "",
-              housingType: "apartment",
+              housingType: [],
               bedrooms: "2",
               bathrooms: "2",
               furnished: false,
@@ -356,15 +357,37 @@ export default function AgentClientDetailPage() {
 
         if (housing) {
           // DB 필드명 → UI 필드명 변환
+          // housing_type이 배열이 아닌 경우 배열로 변환 (기존 데이터 호환성)
+          let housingTypeArray: string[] = [];
+          if (housing.housing_type) {
+            if (Array.isArray(housing.housing_type)) {
+              housingTypeArray = housing.housing_type;
+            } else {
+              // 단일 값인 경우 배열로 변환
+              housingTypeArray = [housing.housing_type];
+            }
+          }
+
+          // parking_count를 문자열로 변환 (4+ 같은 경우 처리)
+          let parkingCountStr = "";
+          if (housing.parking_count !== null && housing.parking_count !== undefined) {
+            if (housing.parking_count >= 4) {
+              parkingCountStr = "4+";
+            } else {
+              parkingCountStr = housing.parking_count.toString();
+            }
+          }
+
           setHousingData({
             preferredArea: housing.preferred_city || "",
             maxBudget: housing.budget_max?.toString() || "",
-            housingType: housing.housing_type || "apartment",
+            housingType: housingTypeArray,
             bedrooms: housing.bedrooms?.toString() || "2",
             bathrooms: housing.bathrooms?.toString() || "2",
             furnished: housing.furnished ?? false,
             hasWasherDryer: housing.has_washer_dryer ?? false,
             parking: housing.parking ?? false,
+            parkingCount: parkingCountStr,
             hasPets: housing.has_pets ?? false,
             petDetails: housing.pet_details || "",
             schoolDistrict: housing.school_district ?? false,
@@ -376,12 +399,13 @@ export default function AgentClientDetailPage() {
           setHousingData({
             preferredArea: "",
             maxBudget: "",
-            housingType: "apartment",
+            housingType: [],
             bedrooms: "2",
             bathrooms: "2",
             furnished: false,
             hasWasherDryer: false,
             parking: false,
+            parkingCount: "",
             hasPets: false,
             petDetails: "",
             schoolDistrict: false,
@@ -399,12 +423,13 @@ export default function AgentClientDetailPage() {
         setHousingData({
           preferredArea: "",
           maxBudget: "",
-          housingType: "apartment",
+          housingType: [],
           bedrooms: "2",
           bathrooms: "2",
           furnished: false,
           hasWasherDryer: false,
           parking: false,
+          parkingCount: "",
           hasPets: false,
           petDetails: "",
           schoolDistrict: false,
@@ -630,15 +655,37 @@ export default function AgentClientDetailPage() {
       const { housing } = await response.json();
 
       // 로컬 상태 업데이트 (DB 필드명 → UI 필드명 변환)
+      // housing_type이 배열이 아닌 경우 배열로 변환 (기존 데이터 호환성)
+      let housingTypeArray: string[] = [];
+      if (housing.housing_type) {
+        if (Array.isArray(housing.housing_type)) {
+          housingTypeArray = housing.housing_type;
+        } else {
+          // 단일 값인 경우 배열로 변환
+          housingTypeArray = [housing.housing_type];
+        }
+      }
+
+      // parking_count를 문자열로 변환 (4+ 같은 경우 처리)
+      let parkingCountStr = "";
+      if (housing.parking_count !== null && housing.parking_count !== undefined) {
+        if (housing.parking_count >= 4) {
+          parkingCountStr = "4+";
+        } else {
+          parkingCountStr = housing.parking_count.toString();
+        }
+      }
+
       setHousingData({
         preferredArea: housing.preferred_city || "",
         maxBudget: housing.budget_max?.toString() || "",
-        housingType: housing.housing_type || "apartment",
+        housingType: housingTypeArray,
         bedrooms: housing.bedrooms?.toString() || "2",
         bathrooms: housing.bathrooms?.toString() || "2",
         furnished: housing.furnished ?? false,
         hasWasherDryer: housing.has_washer_dryer ?? false,
         parking: housing.parking ?? false,
+        parkingCount: parkingCountStr,
         hasPets: housing.has_pets ?? false,
         petDetails: housing.pet_details || "",
         schoolDistrict: housing.school_district ?? false,
@@ -676,33 +723,55 @@ export default function AgentClientDetailPage() {
       setIsSaving(true);
 
       // 모든 항목을 평탄화하여 업데이트할 항목 목록 생성
+      // id가 없는 항목도 포함하여 저장 (API에서 자동 생성)
       const itemsToUpdate = data.flatMap((category) =>
-        category.items
-          .filter((item) => item.id) // DB에 저장된 항목만 (id가 있는 것만)
-          .map((item) => ({
-            id: item.id,
-            completed: item.completed || false,
-            notes: item.notes || null,
-            referenceUrl: item.referenceUrl || null,
-            completedAt: item.completed ? item.completedAt || new Date() : null,
-          })),
+        category.items.map((item) => ({
+          id: item.id || undefined, // id가 없으면 undefined (API에서 생성)
+          title: item.title,
+          category: category.id, // 카테고리 정보 포함
+          description: item.description,
+          completed: item.completed || false,
+          notes: item.notes || null,
+          referenceUrl: item.referenceUrl || null,
+          completedAt: item.completed
+            ? item.completedAt instanceof Date
+              ? item.completedAt.toISOString()
+              : item.completedAt || new Date().toISOString()
+            : null,
+          orderNum: item.orderNum || 0,
+        })),
       );
 
       console.log("[ClientDetail] 체크리스트 업데이트 API 호출 시작:", {
         clientId,
         itemCount: itemsToUpdate.length,
+        itemsWithId: itemsToUpdate.filter((item) => item.id).length,
+        itemsWithoutId: itemsToUpdate.filter((item) => !item.id).length,
       });
 
-      const response = await fetch(`/api/checklist/${clientId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: itemsToUpdate,
-        }),
-      });
+      let response: Response;
+      try {
+        response = await fetch(`/api/checklist/${clientId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: itemsToUpdate,
+          }),
+        });
+      } catch (fetchError) {
+        console.error("[ClientDetail] 네트워크 에러:", fetchError);
+        throw new Error(
+          "서버에 연결할 수 없습니다. 개발 서버가 실행 중인지 확인해주세요."
+        );
+      }
 
       if (!response.ok) {
-        const errorData = await response.json();
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { error: `HTTP ${response.status} 에러` };
+        }
         console.error("[ClientDetail] 체크리스트 업데이트 실패:", {
           status: response.status,
           error: errorData.error,
@@ -727,10 +796,18 @@ export default function AgentClientDetailPage() {
         prev.map((category) => ({
           ...category,
           items: category.items.map((item) => {
-            const updatedItem = updatedItemsMap.get(item.id);
+            // id가 없는 항목의 경우 새로 생성된 id로 업데이트
+            const updatedItem = item.id
+              ? updatedItemsMap.get(item.id)
+              : updated.find(
+                  (u: any) =>
+                    u.title === item.title && u.category === category.id.replace("-", "_")
+                );
+
             if (updatedItem) {
               return {
                 ...item,
+                id: updatedItem.id, // 새로 생성된 id 반영
                 completed: updatedItem.is_completed || false,
                 notes: updatedItem.notes || undefined,
                 referenceUrl: updatedItem.reference_url || undefined,

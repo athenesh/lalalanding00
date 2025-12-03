@@ -1,47 +1,44 @@
 import { NextResponse } from "next/server";
-import { requireAgent, getOrCreateAccount } from "@/lib/auth";
+import { getAuthUserId, requireClient } from "@/lib/auth";
 import { createClerkSupabaseClient } from "@/lib/supabase/server";
 
 /**
- * GET /api/housing/[client_id]
- * 클라이언트의 주거 요구사항을 조회합니다.
+ * GET /api/client/housing
+ * 클라이언트 자신의 주거 요구사항을 조회합니다.
  */
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ client_id: string }> }
-) {
+export async function GET() {
   try {
-    const { client_id } = await params;
-    // API 호출 시작 로그
-    console.log("[API] GET /api/housing/[client_id] 호출:", {
-      clientId: client_id,
-    });
+    console.log("[API] GET /api/client/housing 호출");
 
-    // 에이전트 권한 확인
-    await requireAgent();
+    // 클라이언트 권한 확인
+    await requireClient();
 
+    const userId = await getAuthUserId();
     const supabase = createClerkSupabaseClient();
 
-    // Account 조회 또는 자동 생성
-    const account = await getOrCreateAccount();
-
-    // 클라이언트 소유권 확인
+    // 클라이언트 정보 조회 (clerk_user_id로)
     const { data: client, error: clientError } = await supabase
       .from("clients")
       .select("id")
-      .eq("id", client_id)
-      .eq("owner_agent_id", account.id)
+      .eq("clerk_user_id", userId)
       .single();
 
-    if (clientError || !client) {
-      console.error("[API] Client ownership check failed:", {
-        clientId: client_id,
-        accountId: account.id,
+    if (clientError) {
+      console.error("[API] Client fetch error:", {
+        userId,
         error: clientError,
       });
+      if (clientError.code === "PGRST116") {
+        // 클라이언트를 찾을 수 없음
+        console.warn("[API] Client not found:", { userId });
+        return NextResponse.json(
+          { error: "Client not found" },
+          { status: 404 }
+        );
+      }
       return NextResponse.json(
-        { error: "Client not found or access denied" },
-        { status: 404 }
+        { error: "Failed to fetch client" },
+        { status: 500 }
       );
     }
 
@@ -49,21 +46,21 @@ export async function GET(
     const { data: housing, error: housingError } = await supabase
       .from("housing_requirements")
       .select("*")
-      .eq("client_id", client_id)
+      .eq("client_id", client.id)
       .single();
 
     if (housingError) {
       if (housingError.code === "PGRST116") {
         // 주거 요구사항이 없음 (새로 생성해야 함)
         console.log("[API] Housing requirements not found, returning empty:", {
-          clientId: client_id,
+          clientId: client.id,
         });
         return NextResponse.json({
           housing: null,
         });
       }
       console.error("[API] Housing fetch error:", {
-        clientId: client_id,
+        clientId: client.id,
         error: housingError,
       });
       return NextResponse.json(
@@ -73,7 +70,7 @@ export async function GET(
     }
 
     console.log("[API] Housing requirements 조회 성공:", {
-      clientId: client_id,
+      clientId: client.id,
       housingId: housing?.id,
       housingType: housing?.housing_type,
     });
@@ -85,9 +82,7 @@ export async function GET(
 
     return NextResponse.json({ housing });
   } catch (error) {
-    const { client_id } = await params;
-    console.error("[API] Error in GET /api/housing/[client_id]:", {
-      clientId: client_id,
+    console.error("[API] Error in GET /api/client/housing:", {
       error,
     });
     return NextResponse.json(
@@ -98,44 +93,30 @@ export async function GET(
 }
 
 /**
- * PATCH /api/housing/[client_id]
- * 클라이언트의 주거 요구사항을 업데이트합니다. (없으면 생성)
+ * PATCH /api/client/housing
+ * 클라이언트 자신의 주거 요구사항을 업데이트합니다. (없으면 생성)
  */
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ client_id: string }> }
-) {
+export async function PATCH(request: Request) {
   try {
-    const { client_id } = await params;
-    // API 호출 시작 로그
-    console.log("[API] PATCH /api/housing/[client_id] 호출:", {
-      clientId: client_id,
-    });
+    console.log("[API] PATCH /api/client/housing 호출");
 
-    // 에이전트 권한 확인
-    await requireAgent();
+    // 클라이언트 권한 확인
+    await requireClient();
 
+    const userId = await getAuthUserId();
     const supabase = createClerkSupabaseClient();
 
-    // Account 조회 또는 자동 생성
-    const account = await getOrCreateAccount();
-
-    // 클라이언트 소유권 확인
+    // 클라이언트 정보 조회 (clerk_user_id로)
     const { data: client, error: clientError } = await supabase
       .from("clients")
       .select("id")
-      .eq("id", client_id)
-      .eq("owner_agent_id", account.id)
+      .eq("clerk_user_id", userId)
       .single();
 
     if (clientError || !client) {
-      console.error("[API] Client ownership check failed:", {
-        clientId: client_id,
-        accountId: account.id,
-        error: clientError,
-      });
+      console.error("[API] Client not found:", { userId, error: clientError });
       return NextResponse.json(
-        { error: "Client not found or access denied" },
+        { error: "Client not found" },
         { status: 404 }
       );
     }
@@ -159,7 +140,7 @@ export async function PATCH(
     } = body;
 
     console.log("[API] 주거 요구사항 업데이트 데이터:", {
-      clientId: client_id,
+      clientId: client.id,
       preferredArea,
       maxBudget,
       housingType,
@@ -178,10 +159,10 @@ export async function PATCH(
 
     // 데이터 변환 (UI 필드명 → DB 필드명)
     // housingType이 배열인지 확인하고, 배열이 아니면 빈 배열로 처리
-    const housingTypeArray = Array.isArray(housingType) 
-      ? housingType 
-      : housingType 
-        ? [housingType] 
+    const housingTypeArray = Array.isArray(housingType)
+      ? housingType
+      : housingType
+        ? [housingType]
         : null;
 
     console.log("[API] housingType 변환:", {
@@ -226,7 +207,7 @@ export async function PATCH(
     const { data: existingHousing } = await supabase
       .from("housing_requirements")
       .select("id")
-      .eq("client_id", client_id)
+      .eq("client_id", client.id)
       .single();
 
     let housing;
@@ -242,7 +223,7 @@ export async function PATCH(
 
       if (updateError) {
         console.error("[API] Housing update error:", {
-          clientId: client_id,
+          clientId: client.id,
           error: updateError,
         });
         return NextResponse.json(
@@ -257,7 +238,7 @@ export async function PATCH(
       const { data: newHousing, error: insertError } = await supabase
         .from("housing_requirements")
         .insert({
-          client_id: client_id,
+          client_id: client.id,
           ...updateData,
         })
         .select()
@@ -265,7 +246,7 @@ export async function PATCH(
 
       if (insertError) {
         console.error("[API] Housing insert error:", {
-          clientId: client_id,
+          clientId: client.id,
           error: insertError,
         });
         return NextResponse.json(
@@ -278,15 +259,13 @@ export async function PATCH(
     }
 
     console.log("[API] Housing requirements 업데이트 성공:", {
-      clientId: client_id,
+      clientId: client.id,
       housingId: housing.id,
     });
 
     return NextResponse.json({ housing });
   } catch (error) {
-    const { client_id } = await params;
-    console.error("[API] Error in PATCH /api/housing/[client_id]:", {
-      clientId: client_id,
+    console.error("[API] Error in PATCH /api/client/housing:", {
       error,
     });
     return NextResponse.json(

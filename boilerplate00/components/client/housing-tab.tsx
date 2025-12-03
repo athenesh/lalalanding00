@@ -5,19 +5,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 
 interface HousingData {
   preferredArea: string;
   maxBudget: string;
-  housingType: string;
+  housingType: string[];
   bedrooms: string;
   bathrooms: string;
   furnished: boolean;
   hasWasherDryer: boolean;
   parking: boolean;
+  parkingCount: string;
   hasPets: boolean;
   petDetails: string;
   schoolDistrict: boolean;
@@ -35,12 +35,13 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
   const [formData, setFormData] = useState<HousingData>({
     preferredArea: initialData?.preferredArea || "",
     maxBudget: initialData?.maxBudget || "",
-    housingType: initialData?.housingType || "apartment",
+    housingType: initialData?.housingType || [],
     bedrooms: initialData?.bedrooms || "2",
     bathrooms: initialData?.bathrooms || "2",
     furnished: initialData?.furnished ?? false,
     hasWasherDryer: initialData?.hasWasherDryer ?? false,
     parking: initialData?.parking ?? false,
+    parkingCount: initialData?.parkingCount || "",
     hasPets: initialData?.hasPets ?? false,
     petDetails: initialData?.petDetails || "",
     schoolDistrict: initialData?.schoolDistrict ?? false,
@@ -60,6 +61,7 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
         furnished: initialData.furnished ?? prev.furnished,
         hasWasherDryer: initialData.hasWasherDryer ?? prev.hasWasherDryer,
         parking: initialData.parking ?? prev.parking,
+        parkingCount: initialData.parkingCount ?? prev.parkingCount,
         hasPets: initialData.hasPets ?? prev.hasPets,
         petDetails: initialData.petDetails ?? prev.petDetails,
         schoolDistrict: initialData.schoolDistrict ?? prev.schoolDistrict,
@@ -68,7 +70,22 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
       }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialData?.preferredArea, initialData?.maxBudget, initialData?.housingType, initialData?.bedrooms, initialData?.bathrooms, initialData?.furnished, initialData?.hasWasherDryer, initialData?.parking, initialData?.hasPets, initialData?.petDetails, initialData?.schoolDistrict, initialData?.workplaceAddress, initialData?.additionalNotes]);
+  }, [
+    initialData?.preferredArea,
+    initialData?.maxBudget,
+    initialData?.housingType,
+    initialData?.bedrooms,
+    initialData?.bathrooms,
+    initialData?.furnished,
+    initialData?.hasWasherDryer,
+    initialData?.parking,
+    initialData?.parkingCount,
+    initialData?.hasPets,
+    initialData?.petDetails,
+    initialData?.schoolDistrict,
+    initialData?.workplaceAddress,
+    initialData?.additionalNotes,
+  ]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +104,9 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
           <Input
             id="area"
             value={formData.preferredArea}
-            onChange={(e) => setFormData({ ...formData, preferredArea: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, preferredArea: e.target.value })
+            }
             placeholder="예: 로스앤젤레스, CA"
           />
         </div>
@@ -95,44 +114,78 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
         <div className="space-y-2">
           <Label htmlFor="budget">최대 예산 (USD/월)</Label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+              $
+            </span>
             <Input
               id="budget"
               type="number"
               value={formData.maxBudget}
-              onChange={(e) => setFormData({ ...formData, maxBudget: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, maxBudget: e.target.value })
+              }
               placeholder="3000"
               className="pl-8"
             />
           </div>
-          <p className="text-sm text-muted-foreground">💡 월 임대료 기준입니다</p>
+          <p className="text-sm text-muted-foreground">
+            💡 월 임대료 기준입니다
+          </p>
         </div>
 
         <div className="space-y-3">
           <Label>주거 형태</Label>
-          <RadioGroup
-            value={formData.housingType}
-            onValueChange={(value) => setFormData({ ...formData, housingType: value })}
-          >
+          <div className="space-y-3">
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="apartment" id="apartment" />
+              <Checkbox
+                id="apartment"
+                checked={formData.housingType.includes("apartment")}
+                onCheckedChange={(checked) => {
+                  const newTypes = checked
+                    ? [...formData.housingType, "apartment"]
+                    : formData.housingType.filter(
+                        (type) => type !== "apartment",
+                      );
+                  setFormData({ ...formData, housingType: newTypes });
+                }}
+              />
               <Label htmlFor="apartment" className="font-normal cursor-pointer">
                 아파트
               </Label>
             </div>
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="house" id="house" />
+              <Checkbox
+                id="house"
+                checked={formData.housingType.includes("house")}
+                onCheckedChange={(checked) => {
+                  const newTypes = checked
+                    ? [...formData.housingType, "house"]
+                    : formData.housingType.filter((type) => type !== "house");
+                  setFormData({ ...formData, housingType: newTypes });
+                }}
+              />
               <Label htmlFor="house" className="font-normal cursor-pointer">
                 단독주택
               </Label>
             </div>
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="townhouse" id="townhouse" />
+              <Checkbox
+                id="townhouse"
+                checked={formData.housingType.includes("townhouse")}
+                onCheckedChange={(checked) => {
+                  const newTypes = checked
+                    ? [...formData.housingType, "townhouse"]
+                    : formData.housingType.filter(
+                        (type) => type !== "townhouse",
+                      );
+                  setFormData({ ...formData, housingType: newTypes });
+                }}
+              />
               <Label htmlFor="townhouse" className="font-normal cursor-pointer">
                 타운하우스
               </Label>
             </div>
-          </RadioGroup>
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -195,11 +248,14 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
                 setFormData({ ...formData, hasWasherDryer: checked === true })
               }
             />
-            <Label htmlFor="hasWasherDryer" className="font-normal cursor-pointer">
+            <Label
+              htmlFor="hasWasherDryer"
+              className="font-normal cursor-pointer"
+            >
               세탁기/건조기
             </Label>
             <span className="text-xs text-muted-foreground ml-2">
-              (세탁기와 건조기가 있는 집을 원하시나요?)
+              세탁기와 건조기가 있는 집은 시세보다 비쌀 수도 있습니다
             </span>
           </div>
 
@@ -208,13 +264,40 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
               id="parking"
               checked={formData.parking}
               onCheckedChange={(checked) =>
-                setFormData({ ...formData, parking: checked === true })
+                setFormData({
+                  ...formData,
+                  parking: checked === true,
+                  parkingCount: checked === true ? formData.parkingCount : "",
+                })
               }
             />
             <Label htmlFor="parking" className="font-normal cursor-pointer">
               주차장
             </Label>
           </div>
+
+          {formData.parking && (
+            <div className="space-y-3 ml-6">
+              <Label>차량 수</Label>
+              <div className="flex gap-2 flex-wrap">
+                {["1", "2", "3", "4+"].map((num) => (
+                  <Button
+                    key={num}
+                    type="button"
+                    variant={
+                      formData.parkingCount === num ? "default" : "outline"
+                    }
+                    onClick={() =>
+                      setFormData({ ...formData, parkingCount: num })
+                    }
+                    className="flex-1 min-w-[80px]"
+                  >
+                    {num}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -241,7 +324,9 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
               <Textarea
                 id="petDetails"
                 value={formData.petDetails}
-                onChange={(e) => setFormData({ ...formData, petDetails: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, petDetails: e.target.value })
+                }
                 placeholder="예: 강아지 2마리, 고양이 1마리"
                 rows={3}
               />
@@ -256,7 +341,10 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
                 setFormData({ ...formData, schoolDistrict: checked === true })
               }
             />
-            <Label htmlFor="schoolDistrict" className="font-normal cursor-pointer">
+            <Label
+              htmlFor="schoolDistrict"
+              className="font-normal cursor-pointer"
+            >
               학군 중요
             </Label>
           </div>
@@ -272,7 +360,9 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
             <Input
               id="workplaceAddress"
               value={formData.workplaceAddress}
-              onChange={(e) => setFormData({ ...formData, workplaceAddress: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, workplaceAddress: e.target.value })
+              }
               placeholder="예: 123 Main St, Los Angeles, CA 90001"
             />
           </div>
@@ -282,7 +372,9 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
             <Textarea
               id="additionalNotes"
               value={formData.additionalNotes}
-              onChange={(e) => setFormData({ ...formData, additionalNotes: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, additionalNotes: e.target.value })
+              }
               placeholder="기타 요청사항을 입력해주세요"
               rows={4}
             />
@@ -298,4 +390,3 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
     </form>
   );
 }
-
