@@ -2,8 +2,7 @@
  * @file checklist.ts
  * @description 체크리스트 관련 타입 정의 및 유틸리티 함수
  *
- * us-settlement-guide의 타입을 Next.js 프로젝트에 맞게 변환하고,
- * DB 스키마와 UI 간의 데이터 변환을 위한 유틸리티를 제공합니다.
+ * Supabase DB 스키마와 UI 간의 데이터 변환을 위한 유틸리티를 제공합니다.
  */
 
 export enum TimelinePhase {
@@ -41,10 +40,10 @@ export interface ChecklistFile {
 
 /**
  * UI에서 사용하는 체크리스트 항목 타입
- * us-settlement-guide의 ChecklistItem과 호환
  */
 export interface ChecklistItem {
-  id: string;
+  id?: string; // checklist_items의 id (없을 수 있음)
+  templateId?: string; // checklist_templates의 id (템플릿 기준 로직)
   title: string;
   category: string; // sub_category (예: "서류 준비", "운전면허")
   phase: TimelinePhase;
@@ -64,12 +63,18 @@ export interface ChecklistItem {
  */
 export function dbCategoryToPhase(category: string): TimelinePhase {
   const mapping: Record<string, TimelinePhase> = {
+    // 영어 카테고리
     'pre_departure': TimelinePhase.PRE_DEPARTURE,
     'arrival': TimelinePhase.ARRIVAL,
     'settlement_early': TimelinePhase.EARLY_SETTLEMENT,
     'settlement_complete': TimelinePhase.SETTLEMENT_COMPLETE,
     // 기존 호환성
     'settlement': TimelinePhase.EARLY_SETTLEMENT,
+    // 한글 카테고리
+    '출국 전 준비': TimelinePhase.PRE_DEPARTURE,
+    '입국 직후': TimelinePhase.ARRIVAL,
+    '정착 초기': TimelinePhase.EARLY_SETTLEMENT,
+    '정착 완료': TimelinePhase.SETTLEMENT_COMPLETE,
   };
   
   return mapping[category] || TimelinePhase.PRE_DEPARTURE;

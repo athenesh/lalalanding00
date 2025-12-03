@@ -631,7 +631,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      db_to_ui_category: { Args: { db_category: string }; Returns: string }
+      get_checklist_progress: {
+        Args: { p_client_id: string }
+        Returns: {
+          completed_items: number
+          completion_percentage: number
+          total_items: number
+        }[]
+      }
+      ui_to_db_category: { Args: { ui_category: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never

@@ -1,4 +1,4 @@
--- us-settlement-guide의 모든 체크리스트 데이터를 checklist_templates에 삽입
+-- 초기 체크리스트 템플릿 데이터를 checklist_templates에 삽입
 -- 기존 템플릿은 삭제하고 새 데이터로 교체
 
 -- 기존 템플릿 삭제 (선택사항 - 주석 해제하여 실행)

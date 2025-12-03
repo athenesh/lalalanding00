@@ -2,14 +2,12 @@
 
 /**
  * @file checklist-tab.tsx
- * @description 체크리스트 탭 컴포넌트 (UI 우선 접근)
+ * @description 체크리스트 탭 컴포넌트
  *
- * us-settlement-guide의 UI를 그대로 가져와서 하드코딩 데이터로 동작합니다.
- * Phase 1: UI 완성 (하드코딩 데이터)
- * Phase 2: Supabase 연동 추가 예정
+ * Supabase에서 로드된 체크리스트 데이터를 표시하고 관리합니다.
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   CheckCircle,
   Circle,
@@ -27,10 +25,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChecklistItem, TimelinePhase, ChecklistFile } from "@/types/checklist";
-import { CHECKLIST_DATA } from "@/constants/checklist-data";
 
 interface ChecklistTabProps {
   movingDate?: string; // 클라이언트의 이주 날짜
+  // 추가: Supabase 연동용 props (optional)
+  initialData?: ChecklistItem[]; // API에서 받은 데이터
+  onSave?: (items: ChecklistItem[]) => Promise<void>; // 저장 핸들러
+  isLoading?: boolean; // 로딩 상태
 }
 
 // D-Day Card 컴포넌트
@@ -75,7 +76,7 @@ const ProgressCard = ({ percent }: { percent: number }) => {
   );
 };
 
-// ChecklistRow 컴포넌트 (us-settlement-guide와 동일)
+// ChecklistRow 컴포넌트 - 개별 체크리스트 항목
 const ChecklistRow = ({
   item,
   onUpdateItem,
@@ -84,12 +85,17 @@ const ChecklistRow = ({
   isExpanded,
 }: {
   item: ChecklistItem;
-  onUpdateItem: (id: string, updates: Partial<ChecklistItem>) => void;
+  onUpdateItem: (
+    id: string,
+    updates: Partial<ChecklistItem>,
+    shouldSave?: boolean,
+  ) => void;
   onToggle: (id: string) => void;
   onExpand: (id: string) => void;
   isExpanded: boolean;
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const memoDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -102,21 +108,43 @@ const ChecklistRow = ({
         timestamp: Date.now(),
       };
 
-      onUpdateItem(item.id, { files: [...item.files, newFile] });
+      onUpdateItem(item.id || item.templateId!, {
+        files: [...item.files, newFile],
+      });
       // Reset input
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
   const handleDeleteFile = (fileId: string) => {
-    onUpdateItem(item.id, {
+    onUpdateItem(item.id || item.templateId!, {
       files: item.files.filter((f) => f.id !== fileId),
     });
   };
 
   const handleMemoChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onUpdateItem(item.id, { memo: e.target.value });
+    const newMemo = e.target.value;
+
+    // 로컬 상태는 즉시 업데이트 (UI 반응성)
+    onUpdateItem(item.id || item.templateId!, { memo: newMemo }, false);
+
+    // debounce: 500ms 후에만 서버에 저장
+    if (memoDebounceRef.current) {
+      clearTimeout(memoDebounceRef.current);
+    }
+    memoDebounceRef.current = setTimeout(() => {
+      onUpdateItem(item.id || item.templateId!, { memo: newMemo }, true);
+    }, 500);
   };
+
+  // cleanup: 컴포넌트 unmount 시 debounce 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (memoDebounceRef.current) {
+        clearTimeout(memoDebounceRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div
@@ -129,12 +157,12 @@ const ChecklistRow = ({
     >
       <div
         className="flex items-center p-5 cursor-pointer"
-        onClick={() => onExpand(item.id)}
+        onClick={() => onExpand(item.id || item.templateId!)}
       >
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onToggle(item.id);
+            onToggle(item.id || item.templateId!);
           }}
           className="mr-5 text-slate-300 hover:text-indigo-500 transition-colors focus:outline-none shrink-0"
         >
@@ -311,12 +339,30 @@ const ChecklistRow = ({
   );
 };
 
-export default function ChecklistTab({ movingDate }: ChecklistTabProps) {
-  const [checklist, setChecklist] = useState<ChecklistItem[]>(CHECKLIST_DATA);
+export default function ChecklistTab({
+  movingDate,
+  initialData, // 추가
+  onSave, // 추가
+  isLoading = false, // 추가
+}: ChecklistTabProps) {
+  // Supabase에서 로드된 데이터 사용 (하드코딩 데이터 제거됨)
+  const [checklist, setChecklist] = useState<ChecklistItem[]>(
+    initialData || [],
+  );
+
   const [activeTab, setActiveTab] = useState<TimelinePhase>(
     TimelinePhase.PRE_DEPARTURE,
   );
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [isSaving, setIsSaving] = useState(false); // 저장 중 상태 추가
+
+  // initialData가 변경되면 checklist 상태 업데이트
+  useEffect(() => {
+    if (initialData !== undefined) {
+      // initialData가 로드되었을 때 (빈 배열 포함)
+      setChecklist(initialData);
+    }
+  }, [initialData]);
 
   // Auto expand first uncompleted item of active phase
   useEffect(() => {
@@ -324,22 +370,51 @@ export default function ChecklistTab({ movingDate }: ChecklistTabProps) {
       (i) => i.phase === activeTab && !i.isCompleted,
     );
     if (firstUncompleted) {
-      setExpandedItems(new Set([firstUncompleted.id]));
+      setExpandedItems(
+        new Set([firstUncompleted.id || firstUncompleted.templateId!]),
+      );
     }
   }, [activeTab, checklist]);
 
-  const updateChecklistItem = (id: string, updates: Partial<ChecklistItem>) => {
-    setChecklist((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updates } : item)),
+  const updateChecklistItem = async (
+    id: string,
+    updates: Partial<ChecklistItem>,
+    shouldSave: boolean = true, // 기본값: true (즉시 저장)
+  ) => {
+    const previousChecklist = [...checklist]; // 이전 상태 저장 (에러 복구용)
+    const updatedChecklist = checklist.map((item) =>
+      (item.id || item.templateId) === id ? { ...item, ...updates } : item,
     );
+
+    // 로컬 상태 즉시 업데이트 (낙관적 업데이트)
+    setChecklist(updatedChecklist);
+
+    // Supabase 연동 모드이고 onSave가 있고 shouldSave가 true면 저장
+    if (onSave && shouldSave) {
+      try {
+        setIsSaving(true);
+        await onSave(updatedChecklist);
+      } catch (error) {
+        console.error("[ChecklistTab] 저장 실패:", error);
+        // 에러 발생 시 이전 상태로 복구
+        setChecklist(previousChecklist);
+        throw error;
+      } finally {
+        setIsSaving(false);
+      }
+    }
   };
 
-  const toggleCheck = (id: string) => {
-    setChecklist((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, isCompleted: !item.isCompleted } : item,
-      ),
-    );
+  const toggleCheck = async (id: string) => {
+    const item = checklist.find((i) => (i.id || i.templateId) === id);
+    if (!item) return;
+
+    const updates = {
+      isCompleted: !item.isCompleted,
+      completedAt: !item.isCompleted ? new Date() : undefined,
+    };
+
+    await updateChecklistItem(id, updates);
   };
 
   const toggleExpand = (id: string) => {
@@ -385,8 +460,40 @@ export default function ChecklistTab({ movingDate }: ChecklistTabProps) {
     },
   ];
 
+  // 로딩 상태 표시
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12">
+          <p className="text-slate-400 font-medium">
+            체크리스트를 불러오는 중...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // 로딩 중이거나 데이터가 없는 경우
+  if (isLoading && checklist.length === 0) {
+    return (
+      <div className="max-w-4xl mx-auto p-6 space-y-6">
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-600 mx-auto mb-4"></div>
+          <p className="text-slate-500">체크리스트를 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {/* 저장 중 표시 */}
+      {isSaving && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700 text-center">
+          저장 중...
+        </div>
+      )}
+
       {/* Top Dashboard Widgets */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         <DDayCard movingDate={movingDate} />
@@ -472,12 +579,12 @@ export default function ChecklistTab({ movingDate }: ChecklistTabProps) {
         ) : (
           currentItems.map((item) => (
             <ChecklistRow
-              key={item.id}
+              key={item.id || item.templateId}
               item={item}
               onToggle={toggleCheck}
               onUpdateItem={updateChecklistItem}
               onExpand={toggleExpand}
-              isExpanded={expandedItems.has(item.id)}
+              isExpanded={expandedItems.has(item.id || item.templateId)}
             />
           ))
         )}

@@ -88,10 +88,11 @@ export default function ClientHomePage() {
       const emergencyContacts = data.emergencyContacts || [];
 
       // 클라이언트 데이터 설정
+      // 체크리스트 완료율은 loadChecklistData에서 계산
       setClientData({
         name: client.name || "",
         movingDate: client.moving_date || "",
-        checklistCompletion: 0, // TODO: 체크리스트 완료율 계산
+        checklistCompletion: clientData.checklistCompletion, // 기존 값 유지
       });
 
       // 프로필 데이터 변환
@@ -241,12 +242,37 @@ export default function ClientHomePage() {
       if (checklist && checklist.length > 0) {
         // API에서 이미 ChecklistItem 형식으로 변환되어 반환됨
         setChecklistData(checklist);
+
+        // 체크리스트 완료율 계산
+        const completedCount = checklist.filter(
+          (item: any) => item.isCompleted,
+        ).length;
+        const completionPercent = Math.round(
+          (completedCount / checklist.length) * 100,
+        );
+
+        setClientData((prev) => ({
+          ...prev,
+          checklistCompletion: completionPercent,
+        }));
       } else {
         setChecklistData([]);
+        setClientData((prev) => ({
+          ...prev,
+          checklistCompletion: 0,
+        }));
       }
 
       console.log("[ClientHomePage] 체크리스트 데이터 로드 성공:", {
         itemCount: checklist?.length || 0,
+        completionPercent:
+          checklist && checklist.length > 0
+            ? Math.round(
+                (checklist.filter((item: any) => item.isCompleted).length /
+                  checklist.length) *
+                  100,
+              )
+            : 0,
       });
     } catch (error) {
       console.error("[ClientHomePage] 체크리스트 데이터 로드 실패:", error);
@@ -269,22 +295,17 @@ export default function ClientHomePage() {
       });
 
       // ChecklistItem을 DB 업데이트 형식으로 변환
+      // 템플릿 기준 로직: templateId를 기준으로 상태만 저장
       const itemsToUpdate = items.map((item: any) => ({
-        id: item.id || undefined,
-        title: item.title,
-        phase: item.phase, // TimelinePhase enum 값
-        category: item.category, // sub_category
-        description: item.description, // ChecklistItemContent[] 배열
+        id: item.id || undefined, // checklist_items의 id (있으면 업데이트, 없으면 생성)
+        templateId: item.templateId, // 템플릿 ID (필수)
         isCompleted: item.isCompleted || false,
         memo: item.memo || "",
-        referenceUrl: item.referenceUrl || null,
         completedAt: item.completedAt
           ? item.completedAt instanceof Date
             ? item.completedAt.toISOString()
             : item.completedAt
           : null,
-        orderNum: item.orderNum || 0,
-        isRequired: item.isRequired || false,
       }));
 
       console.log("[ClientHomePage] 체크리스트 업데이트 항목:", {
@@ -324,8 +345,45 @@ export default function ClientHomePage() {
 
       const { updated } = await response.json();
 
-      // 데이터 다시 로드하여 최신 상태 반영
-      await loadChecklistData();
+      // 서버 응답 데이터로 로컬 상태만 부분 업데이트 (재렌더링 최소화)
+      if (updated && updated.length > 0) {
+        setChecklistData((prevChecklist) => {
+          const updatedMap = new Map(
+            updated.map((item: any) => [item.template_id, item]),
+          );
+
+          const newChecklist = prevChecklist.map((item: any) => {
+            const serverItem = updatedMap.get(item.templateId) as any;
+            if (serverItem) {
+              // 서버에서 받은 데이터로 부분 업데이트
+              return {
+                ...item,
+                id: serverItem.id || item.id, // 새로 생성된 경우 id 업데이트
+                isCompleted: serverItem.is_completed ?? item.isCompleted,
+                memo: serverItem.notes || item.memo || "",
+                completedAt: serverItem.completed_at
+                  ? new Date(serverItem.completed_at)
+                  : item.completedAt,
+              };
+            }
+            return item;
+          });
+
+          // 완료율 재계산
+          const completedCount = newChecklist.filter(
+            (item: any) => item.isCompleted,
+          ).length;
+          const completionPercent = Math.round(
+            (completedCount / newChecklist.length) * 100,
+          );
+          setClientData((prev) => ({
+            ...prev,
+            checklistCompletion: completionPercent,
+          }));
+
+          return newChecklist;
+        });
+      }
 
       console.log("[ClientHomePage] 체크리스트 저장 성공:", {
         updatedCount: updated.length,
@@ -623,7 +681,14 @@ export default function ClientHomePage() {
               </TabsContent>
 
               <TabsContent value="checklist" className="space-y-6">
-                <ChecklistTab movingDate={clientData.movingDate} />
+                <ChecklistTab
+                  movingDate={clientData.movingDate}
+                  initialData={
+                    checklistData.length > 0 ? checklistData : undefined
+                  }
+                  onSave={handleSaveChecklist}
+                  isLoading={isLoadingChecklist}
+                />
               </TabsContent>
 
               <TabsContent value="chat" className="space-y-6">
