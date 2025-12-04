@@ -12,7 +12,7 @@ import { dbCategoryToPhase } from "@/types/checklist";
 /**
  * GET /api/checklist/[client_id]
  * 클라이언트의 체크리스트를 조회합니다.
- * 
+ *
  * 로직:
  * 1. 템플릿을 기준으로 화면 구성 (템플릿이 메인)
  * 2. 각 템플릿에 대해 checklist_items에서 상태 정보만 조회 (template_id로 매칭)
@@ -20,7 +20,7 @@ import { dbCategoryToPhase } from "@/types/checklist";
  */
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ client_id: string }> }
+  { params }: { params: Promise<{ client_id: string }> },
 ) {
   try {
     const { client_id } = await params;
@@ -52,14 +52,16 @@ export async function GET(
       });
       return NextResponse.json(
         { error: "Client not found or access denied" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     // 1. 템플릿 조회 (항상 최신 템플릿 사용)
     const { data: templates, error: templateError } = await supabase
       .from("checklist_templates")
-      .select("id,title,category,sub_category,description,order_num,is_required")
+      .select(
+        "id,title,category,sub_category,description,order_num,is_required",
+      )
       .order("category,order_num", { ascending: true });
 
     if (templateError) {
@@ -69,7 +71,7 @@ export async function GET(
       });
       return NextResponse.json(
         { error: "Failed to fetch templates" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -84,9 +86,7 @@ export async function GET(
     // 2. 클라이언트의 체크리스트 상태 조회 (template_id로 매칭)
     const { data: checklistItems, error: checklistError } = await supabase
       .from("checklist_items")
-      .select(
-        "id,template_id,is_completed,notes,completed_at"
-      )
+      .select("id,template_id,is_completed,notes,completed_at")
       .eq("client_id", client_id);
 
     if (checklistError) {
@@ -99,14 +99,14 @@ export async function GET(
 
     // template_id를 키로 하는 맵 생성
     const itemsByTemplateId = new Map(
-      (checklistItems || []).map((item) => [item.template_id, item])
+      (checklistItems || []).map((item) => [item.template_id, item]),
     );
 
     // 3. 템플릿과 클라이언트 상태 병합
     const mergedItems = await Promise.all(
       templates.map(async (template) => {
         const clientItem = itemsByTemplateId.get(template.id);
-        
+
         // 파일 목록 조회 (clientItem이 있는 경우만)
         let files: any[] = [];
         if (clientItem?.id) {
@@ -119,11 +119,11 @@ export async function GET(
           id: clientItem?.id || undefined,
           templateId: template.id,
           title: template.title,
-          category: template.sub_category || '',
+          category: template.sub_category || "",
           phase: dbCategoryToPhase(template.category),
           description: parseDescription(template.description),
           isCompleted: clientItem?.is_completed || false,
-          memo: clientItem?.notes || '',
+          memo: clientItem?.notes || "",
           files: files,
           referenceUrl: undefined,
           isRequired: template.is_required || false,
@@ -132,18 +132,18 @@ export async function GET(
             : undefined,
           orderNum: template.order_num,
         };
-      })
+      }),
     );
 
     // category별로 그룹화
     const groupedByCategory: Record<string, any[]> = {};
     mergedItems.forEach((item) => {
       const dbCategory = item.phase
-        .replace('PRE_DEPARTURE', 'pre_departure')
-        .replace('ARRIVAL', 'arrival')
-        .replace('EARLY_SETTLEMENT', 'settlement_early')
-        .replace('SETTLEMENT_COMPLETE', 'settlement_complete');
-      
+        .replace("PRE_DEPARTURE", "pre_departure")
+        .replace("ARRIVAL", "arrival")
+        .replace("EARLY_SETTLEMENT", "settlement_early")
+        .replace("SETTLEMENT_COMPLETE", "settlement_complete");
+
       if (!groupedByCategory[dbCategory]) {
         groupedByCategory[dbCategory] = [];
       }
@@ -169,7 +169,7 @@ export async function GET(
     });
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -177,7 +177,7 @@ export async function GET(
 /**
  * PATCH /api/checklist/[client_id]
  * 체크리스트 항목들을 업데이트합니다.
- * 
+ *
  * 로직:
  * - templateId를 기준으로 checklist_items 업데이트/생성
  * - 상태 정보만 저장 (is_completed, notes, completed_at)
@@ -185,7 +185,7 @@ export async function GET(
  */
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ client_id: string }> }
+  { params }: { params: Promise<{ client_id: string }> },
 ) {
   try {
     const { client_id } = await params;
@@ -217,7 +217,7 @@ export async function PATCH(
       });
       return NextResponse.json(
         { error: "Client not found or access denied" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -227,7 +227,7 @@ export async function PATCH(
     if (!Array.isArray(items)) {
       return NextResponse.json(
         { error: "Items must be an array" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -355,12 +355,7 @@ export async function PATCH(
     });
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-
-
-
-
-
