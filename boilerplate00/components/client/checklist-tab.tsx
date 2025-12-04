@@ -225,29 +225,66 @@ const ChecklistRow = ({
       {isExpanded && (
         <div className="px-5 pb-5 pl-[4.5rem] animate-fadeIn border-t border-slate-50 pt-4">
           {/* Main Description */}
-          <div className="space-y-3 text-slate-600 text-sm leading-relaxed mb-6">
-            {item.description.map((desc, idx) => (
-              <div key={idx}>
-                <p
-                  className={cn(
-                    "flex items-start gap-2",
-                    desc.important && "font-semibold text-slate-800",
+          <div className="space-y-4 text-slate-600 text-sm leading-relaxed mb-6">
+            {item.description.map((desc, idx) => {
+              // 메인 설명 텍스트 (important가 true이고 subText가 없는 경우)
+              if (desc.important && !desc.subText) {
+                return (
+                  <p key={idx} className="text-slate-700 leading-relaxed">
+                    {desc.text}
+                  </p>
+                );
+              }
+
+              // "체크리스트" 제목 + 불릿 포인트 리스트 (스크린샷 스타일)
+              if (desc.text === "체크리스트" && desc.subText) {
+                return (
+                  <div key={idx} className="space-y-2">
+                    <h4 className="font-semibold text-slate-800 text-sm mb-2">
+                      {desc.text}
+                    </h4>
+                    <ul className="space-y-1.5 text-slate-600">
+                      {desc.subText.map((sub, sIdx) => (
+                        <li key={sIdx} className="flex gap-2 items-start">
+                          <span className="shrink-0 text-slate-400 mt-0.5">
+                            •
+                          </span>
+                          <span>{sub}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              }
+
+              // 일반 설명 텍스트 (subText가 없는 경우)
+              if (!desc.subText) {
+                return (
+                  <p key={idx} className="text-slate-700 leading-relaxed">
+                    {desc.text}
+                  </p>
+                );
+              }
+
+              // 제목 + 하위 항목이 있는 경우 (기타 제목들)
+              return (
+                <div key={idx} className="space-y-2">
+                  <h4 className="font-semibold text-slate-800 text-sm">
+                    {desc.text}
+                  </h4>
+                  {desc.subText && (
+                    <ul className="mt-1 space-y-1.5 text-slate-500 text-xs bg-slate-50 p-3 rounded-lg border border-slate-100">
+                      {desc.subText.map((sub, sIdx) => (
+                        <li key={sIdx} className="flex gap-2">
+                          <span className="shrink-0">•</span>
+                          <span>{sub}</span>
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                >
-                  {desc.text}
-                </p>
-                {desc.subText && (
-                  <ul className="mt-1 space-y-1 text-slate-500 text-xs bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    {desc.subText.map((sub, sIdx) => (
-                      <li key={sIdx} className="flex gap-2">
-                        <span className="shrink-0">•</span>
-                        <span>{sub}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
 
           {/* User Interactions Area: Memo & Files */}

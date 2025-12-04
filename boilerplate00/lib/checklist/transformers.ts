@@ -16,27 +16,41 @@ import type {
 import { dbCategoryToPhase, phaseToDbCategory } from '@/types/checklist';
 
 /**
- * DB의 description 문자열을 ChecklistItemContent[]로 파싱
+ * DB의 description을 ChecklistItemContent[]로 파싱
+ * JSONB 타입으로 변경되어 이미 파싱된 객체이거나, 문자열일 수 있음
  */
 export function parseDescription(
-  description: string | null
+  description: string | null | unknown
 ): ChecklistItemContent[] {
   if (!description) return [];
 
   try {
-    // JSON 문자열인 경우
-    const parsed = JSON.parse(description);
-    if (Array.isArray(parsed)) {
-      return parsed as ChecklistItemContent[];
+    // JSONB는 이미 파싱된 객체로 반환됨
+    if (Array.isArray(description)) {
+      return description as ChecklistItemContent[];
     }
+    
     // 단일 객체인 경우 배열로 감싸기
-    if (typeof parsed === 'object' && parsed.text) {
-      return [parsed as ChecklistItemContent];
+    if (typeof description === 'object' && description !== null && 'text' in description) {
+      return [description as ChecklistItemContent];
+    }
+    
+    // 문자열인 경우 (레거시 호환성)
+    if (typeof description === 'string') {
+      const parsed = JSON.parse(description);
+      if (Array.isArray(parsed)) {
+        return parsed as ChecklistItemContent[];
+      }
+      if (typeof parsed === 'object' && parsed.text) {
+        return [parsed as ChecklistItemContent];
+      }
+      // JSON이 아닌 경우: 줄바꿈으로 split하여 단순 텍스트 배열로 변환
+      const lines = description.split('\n').filter(Boolean);
+      return lines.map((line) => ({ text: line }));
     }
   } catch {
-    // JSON이 아닌 경우: 줄바꿈으로 split하여 단순 텍스트 배열로 변환
-    const lines = description.split('\n').filter(Boolean);
-    return lines.map((line) => ({ text: line }));
+    // 파싱 실패 시 빈 배열 반환
+    return [];
   }
 
   return [];

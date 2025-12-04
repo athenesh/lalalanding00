@@ -29,3 +29,6 @@ INSERT INTO checklist_templates (category, sub_category, title, description, ord
 -- 삽입 확인
 -- SELECT category, COUNT(*) as count FROM checklist_templates GROUP BY category ORDER BY category;
 
+
+
+

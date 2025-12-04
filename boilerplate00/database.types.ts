@@ -153,54 +153,36 @@ export type Database = {
       checklist_items: {
         Row: {
           actual_cost: number | null
-          category: string
           client_id: string
           completed_at: string | null
           created_at: string | null
-          description: string | null
           id: string
           is_completed: boolean | null
-          is_required: boolean | null
           notes: string | null
-          order_num: number
           reference_url: string | null
-          sub_category: string | null
-          template_id: string | null
-          title: string
+          template_id: string
         }
         Insert: {
           actual_cost?: number | null
-          category: string
           client_id: string
           completed_at?: string | null
           created_at?: string | null
-          description?: string | null
           id?: string
           is_completed?: boolean | null
-          is_required?: boolean | null
           notes?: string | null
-          order_num: number
           reference_url?: string | null
-          sub_category?: string | null
-          template_id?: string | null
-          title: string
+          template_id: string
         }
         Update: {
           actual_cost?: number | null
-          category?: string
           client_id?: string
           completed_at?: string | null
           created_at?: string | null
-          description?: string | null
           id?: string
           is_completed?: boolean | null
-          is_required?: boolean | null
           notes?: string | null
-          order_num?: number
           reference_url?: string | null
-          sub_category?: string | null
-          template_id?: string | null
-          title?: string
+          template_id?: string
         }
         Relationships: [
           {
@@ -221,10 +203,9 @@ export type Database = {
       }
       checklist_templates: {
         Row: {
-          applies_to: string | null
           category: string
           created_at: string | null
-          description: string | null
+          description: Json
           id: string
           is_required: boolean | null
           order_num: number
@@ -233,10 +214,9 @@ export type Database = {
           title: string
         }
         Insert: {
-          applies_to?: string | null
           category: string
           created_at?: string | null
-          description?: string | null
+          description: Json
           id?: string
           is_required?: boolean | null
           order_num: number
@@ -245,10 +225,9 @@ export type Database = {
           title: string
         }
         Update: {
-          applies_to?: string | null
           category?: string
           created_at?: string | null
-          description?: string | null
+          description?: Json
           id?: string
           is_required?: boolean | null
           order_num?: number

@@ -170,6 +170,82 @@ Clerk를 Supabase Third-Party Auth로 등록:
 - `useUser`로 최신 역할 정보 확인
 - 에이전트가 아니면 홈으로 리다이렉트
 
+### 7. 체크리스트 관련 오류들
+
+#### 7.1. "Could not find the 'category' column of 'checklist_items' in the schema cache"
+
+**원인**: 마이그레이션(`20251203220740_refactor_checklist_items_to_template_based.sql`)에서 `checklist_items` 테이블의 템플릿 속성 컬럼들(`category`, `title`, `description`, `order_num`, `is_required`)을 제거했는데, API 라우트(`app/api/client/checklist/route.ts`)의 INSERT 문에서 여전히 사용하려고 했습니다.
+
+**해결 방법**:
+
+- `app/api/client/checklist/route.ts`의 PATCH 핸들러에서 INSERT 문 수정
+- 제거된 컬럼들(`category`, `title`, `description`, `order_num`, `is_required`)을 INSERT 문에서 삭제
+- 상태 정보만 저장하도록 변경: `client_id`, `template_id`, `is_completed`, `notes`, `completed_at`만 사용
+
+**적용된 변경사항**:
+
+- `app/api/client/checklist/route.ts` (PATCH 핸들러, 약 280-290줄):
+  - INSERT 문에서 제거된 컬럼들 삭제
+  - 템플릿 속성은 `template_id`로 참조하므로 상태 정보만 저장
+
+#### 7.2. React Key Prop 경고: "Each child in a list should have a unique 'key' prop"
+
+**원인**: `ChecklistTab` 컴포넌트에서 리스트를 렌더링할 때 `item.id`를 key로 사용했는데, `item.id`가 `undefined`일 수 있습니다. 새로 생성되지 않은 체크리스트 항목은 `id`가 없고 `templateId`만 있습니다.
+
+**해결 방법**:
+
+- 모든 리스트 렌더링에서 `key={item.id || item.templateId}` 사용
+- `item.id`가 없을 때 `templateId`를 fallback으로 사용
+
+**적용된 변경사항**:
+
+- `components/client/checklist-tab.tsx`:
+  - 리스트 렌더링 시 `key={item.id || item.templateId}` 사용
+  - `expandedItems` Set에서도 `item.id || item.templateId` 사용
+
+#### 7.3. 체크리스트 하나만 체크하면 전부 체크되는 문제
+
+**원인**: `item.id`가 `undefined`일 때, 여러 항목이 모두 같은 `undefined` id로 인식되어 하나를 체크하면 모든 항목이 같은 `undefined` id로 매칭되어 전부 체크되었습니다.
+
+**해결 방법**:
+
+- 모든 항목 식별자 비교에서 `item.id || item.templateId` 사용
+- `toggleCheck`, `updateChecklistItem`, `onToggle`, `onUpdateItem`, `onExpand` 등 모든 함수에서 고유 식별자 사용
+
+**적용된 변경사항**:
+
+- `components/client/checklist-tab.tsx`:
+  - `ChecklistRow` 컴포넌트: `onToggle(item.id || item.templateId!)`, `onUpdateItem(item.id || item.templateId!, ...)`, `onExpand(item.id || item.templateId!)` 사용
+  - `toggleCheck` 함수: `checklist.find((i) => (i.id || i.templateId) === id)` 사용
+  - `updateChecklistItem` 함수: `(item.id || item.templateId) === id` 비교 사용
+  - `useEffect` (첫 번째 미완료 항목 확장): `firstUncompleted.id || firstUncompleted.templateId!` 사용
+
+#### 7.4. 데이터 저장할 때마다 페이지가 재렌더링되는 문제
+
+**원인**: `handleSaveChecklist` 함수에서 저장 후 `loadChecklistData()`를 호출하여 전체 데이터를 다시 불러오면서 페이지가 재렌더링되었습니다.
+
+**해결 방법**:
+
+- 저장 후 `loadChecklistData()` 호출 제거
+- 서버 응답(`updated`)으로 받은 데이터만 사용하여 로컬 상태 부분 업데이트
+- 완료율만 재계산하여 불필요한 재렌더링 최소화
+
+**적용된 변경사항**:
+
+- `app/client/home/page.tsx` (`handleSaveChecklist` 함수, 약 346-384줄):
+  - `await loadChecklistData()` 호출 제거
+  - 서버 응답의 `updated` 배열을 사용하여 `setChecklistData`로 부분 업데이트
+  - `template_id`를 키로 하여 변경된 항목만 업데이트
+  - 새로 생성된 항목의 경우 `id`도 업데이트
+  - 완료율 재계산을 같은 `setChecklistData` 콜백 내에서 처리
+
+**성능 최적화 추가**:
+
+- `components/client/checklist-tab.tsx`:
+  - 메모 입력에 debounce 적용 (500ms)
+  - 타이핑 중에는 로컬 상태만 업데이트하고, 입력이 멈춘 후에만 서버에 저장
+  - `updateChecklistItem` 함수에 `shouldSave` 파라미터 추가하여 저장 여부 제어
+
 ## 참고 자료
 
 - [Supabase Clerk 통합 가이드](https://supabase.com/docs/guides/auth/third-party/clerk)
