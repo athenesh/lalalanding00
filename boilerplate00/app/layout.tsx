@@ -37,7 +37,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider localization={koKR}>
+    <ClerkProvider
+      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      localization={koKR}
+      appearance={{
+        cssLayerName: "clerk", // Required for Tailwind 4 compatibility
+      }}
+    >
       <html lang="ko">
         <body
           className={`${geistSans.variable} ${geistMono.variable} ${notoSansKR.variable} antialiased`}

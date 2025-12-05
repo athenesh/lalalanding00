@@ -13,6 +13,7 @@ import HousingTab from "@/components/client/housing-tab";
 import ChecklistTab from "@/components/client/checklist-tab";
 import ChatTab from "@/components/client/chat-tab";
 import { useToast } from "@/hooks/use-toast";
+import { TimelinePhase } from "@/types/checklist";
 
 export default function ClientHomePage() {
   const { userId, isLoaded: authLoaded } = useAuth();
@@ -240,15 +241,20 @@ export default function ClientHomePage() {
       const { checklist } = await response.json();
 
       if (checklist && checklist.length > 0) {
-        // API에서 이미 ChecklistItem 형식으로 변환되어 반환됨
-        setChecklistData(checklist);
+        // phase 문자열을 TimelinePhase enum으로 변환
+        const normalizedChecklist = checklist.map((item: any) => ({
+          ...item,
+          phase: item.phase as TimelinePhase, // 타입 단언 또는 변환
+        }));
+
+        setChecklistData(normalizedChecklist);
 
         // 체크리스트 완료율 계산
-        const completedCount = checklist.filter(
+        const completedCount = normalizedChecklist.filter(
           (item: any) => item.isCompleted,
         ).length;
         const completionPercent = Math.round(
-          (completedCount / checklist.length) * 100,
+          (completedCount / normalizedChecklist.length) * 100,
         );
 
         setClientData((prev) => ({

@@ -541,6 +541,7 @@ export type Database = {
           price: number | null
           room_id: string
           shared_by: string
+          square_feet: number | null
           thumbnail_url: string | null
           title: string | null
         }
@@ -556,6 +557,7 @@ export type Database = {
           price?: number | null
           room_id: string
           shared_by: string
+          square_feet?: number | null
           thumbnail_url?: string | null
           title?: string | null
         }
@@ -571,6 +573,7 @@ export type Database = {
           price?: number | null
           room_id?: string
           shared_by?: string
+          square_feet?: number | null
           thumbnail_url?: string | null
           title?: string | null
         }

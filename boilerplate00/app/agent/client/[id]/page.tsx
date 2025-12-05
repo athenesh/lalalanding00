@@ -287,6 +287,7 @@ export default function AgentClientDetailPage() {
 
   const [checklistData, setChecklistData] =
     useState<ChecklistCategory[]>(initialChecklist);
+  const [checklistDataForTab, setChecklistDataForTab] = useState<ChecklistItem[]>([]);
   const [isLoadingChecklist, setIsLoadingChecklist] = useState(true);
 
   // 클라이언트 데이터 로드
@@ -540,51 +541,32 @@ export default function AgentClientDetailPage() {
 
         // DB 데이터를 UI 형식으로 변환
         if (checklist && checklist.length > 0) {
-          // category별로 그룹화
-          const groupedByCategory: Record<string, any[]> = {};
-          checklist.forEach((item: any) => {
-            if (!groupedByCategory[item.category]) {
-              groupedByCategory[item.category] = [];
-            }
-            groupedByCategory[item.category].push(item);
+          // API 응답의 checklist 배열을 직접 사용
+          // phase 필드가 이미 올바르게 설정되어 있으므로 변환만 필요
+          const normalizedChecklist = checklist.map((item: any) => ({
+            ...item,
+            // phase가 문자열인 경우 enum으로 변환
+            phase: item.phase as TimelinePhase,
+          }));
+
+          console.log("[ClientDetail] 체크리스트 데이터 변환 완료:", {
+            totalItems: normalizedChecklist.length,
+            phases: normalizedChecklist.map((item: any) => ({
+              title: item.title,
+              phase: item.phase,
+            })),
           });
 
-          // 하드코딩된 템플릿과 병합
-          const mergedChecklist = initialChecklist.map((category) => {
-            const dbItems = groupedByCategory[category.id] || [];
-
-            return {
-              ...category,
-              items: category.items.map((templateItem) => {
-                // 제목으로 매칭 (더 정확한 매칭을 위해 id도 확인)
-                const dbItem = dbItems.find(
-                  (item: any) =>
-                    item.title === templateItem.title ||
-                    item.id === templateItem.id,
-                );
-
-                if (dbItem) {
-                  return {
-                    ...templateItem,
-                    id: dbItem.id, // DB id 사용
-                    isCompleted: dbItem.is_completed || false,
-                    memo: dbItem.notes || "",
-                    referenceUrl: dbItem.reference_url || undefined,
-                    completedAt: dbItem.completed_at
-                      ? new Date(dbItem.completed_at)
-                      : undefined,
-                    isRequired: dbItem.is_required || false,
-                  };
-                }
-                return templateItem;
-              }),
-            };
-          });
-
-          setChecklistData(mergedChecklist);
+          // ChecklistTab은 flat 배열을 받으므로, 여기서는 빈 배열로 설정
+          // 실제 데이터는 ChecklistTab에 직접 전달
+          setChecklistData([]);
+          
+          // 체크리스트 데이터를 상태로 저장 (ChecklistTab에 전달용)
+          setChecklistDataForTab(normalizedChecklist);
         } else {
-          // 체크리스트가 없으면 템플릿만 사용
-          setChecklistData(initialChecklist);
+          // 체크리스트가 없으면 빈 배열
+          setChecklistData([]);
+          setChecklistDataForTab([]);
         }
 
         console.log("[ClientDetail] 체크리스트 데이터 로드 성공:", {
@@ -795,7 +777,114 @@ export default function AgentClientDetailPage() {
     }
   };
 
-  // 체크리스트 저장 핸들러 (API 호출)
+  // 체크리스트 저장 핸들러 (ChecklistItem[] 직접 사용)
+  const handleSaveChecklistItems = async (items: ChecklistItem[]) => {
+    try {
+      setIsSaving(true);
+      console.log("[ClientDetail] 체크리스트 저장 시작:", {
+        itemCount: items.length,
+      });
+
+      // ChecklistItem을 DB 업데이트 형식으로 변환
+      // 템플릿 기준 로직: templateId를 기준으로 상태만 저장
+      const itemsToUpdate = items.map((item: any) => ({
+        id: item.id || undefined, // checklist_items의 id (있으면 업데이트, 없으면 생성)
+        templateId: item.templateId, // 템플릿 ID (필수)
+        isCompleted: item.isCompleted || false,
+        memo: item.memo || "",
+        completedAt: item.completedAt
+          ? item.completedAt instanceof Date
+            ? item.completedAt.toISOString()
+            : item.completedAt
+          : null,
+      }));
+
+      console.log("[ClientDetail] 체크리스트 업데이트 항목:", {
+        itemCount: itemsToUpdate.length,
+        itemsWithId: itemsToUpdate.filter((item) => item.id).length,
+      });
+
+      let response: Response;
+      try {
+        response = await fetch(`/api/checklist/${clientId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: itemsToUpdate,
+          }),
+        });
+      } catch (fetchError) {
+        console.error("[ClientDetail] 네트워크 에러:", fetchError);
+        throw new Error(
+          "서버에 연결할 수 없습니다. 개발 서버가 실행 중인지 확인해주세요.",
+        );
+      }
+
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { error: `HTTP ${response.status} 에러` };
+        }
+        console.error("[ClientDetail] 체크리스트 저장 실패:", {
+          status: response.status,
+          error: errorData.error,
+        });
+        throw new Error(errorData.error || "Failed to update checklist");
+      }
+
+      const { updated } = await response.json();
+
+      // 서버 응답 데이터로 로컬 상태만 부분 업데이트
+      if (updated && updated.length > 0) {
+        setChecklistDataForTab((prevChecklist) => {
+          const updatedMap = new Map(
+            updated.map((item: any) => [item.template_id, item]),
+          );
+
+          const newChecklist = prevChecklist.map((item: any) => {
+            const serverItem = updatedMap.get(item.templateId) as any;
+            if (serverItem) {
+              // 서버에서 받은 데이터로 부분 업데이트
+              return {
+                ...item,
+                id: serverItem.id || item.id, // 새로 생성된 경우 id 업데이트
+                isCompleted: serverItem.is_completed ?? item.isCompleted,
+                memo: serverItem.notes || item.memo || "",
+                completedAt: serverItem.completed_at
+                  ? new Date(serverItem.completed_at)
+                  : item.completedAt,
+              };
+            }
+            return item;
+          });
+
+          return newChecklist;
+        });
+      }
+
+      toast({
+        title: "저장 완료",
+        description: "체크리스트가 성공적으로 저장되었습니다.",
+      });
+    } catch (error) {
+      console.error("[ClientDetail] 체크리스트 저장 중 에러 발생:", error);
+      toast({
+        title: "저장 실패",
+        description:
+          error instanceof Error
+            ? error.message
+            : "체크리스트 저장에 실패했습니다.",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // 체크리스트 저장 핸들러 (API 호출) - 레거시 (ChecklistCategory[] 형식)
   const handleSaveChecklist = async (data: ChecklistCategory[]) => {
     try {
       setIsSaving(true);
@@ -1047,41 +1136,9 @@ export default function AgentClientDetailPage() {
                   </div>
                 ) : (
                   <ChecklistTab
-                    initialData={checklistData.flatMap(
-                      (category) => category.items,
-                    )}
+                    initialData={checklistDataForTab.length > 0 ? checklistDataForTab : undefined}
                     onSave={async (items: ChecklistItem[]) => {
-                      // ChecklistItem[]를 ChecklistCategory[]로 변환
-                      const categoriesMap = new Map<
-                        string,
-                        ChecklistCategory
-                      >();
-
-                      // 기존 카테고리 구조 유지
-                      checklistData.forEach((category) => {
-                        categoriesMap.set(category.id, {
-                          ...category,
-                          items: [],
-                        });
-                      });
-
-                      // items를 카테고리별로 그룹화
-                      items.forEach((item) => {
-                        // item의 category나 phase를 사용하여 카테고리 찾기
-                        const categoryId =
-                          checklistData.find((cat) =>
-                            cat.items.some((catItem) => catItem.id === item.id),
-                          )?.id || checklistData[0]?.id;
-
-                        const category = categoriesMap.get(categoryId);
-                        if (category) {
-                          category.items.push(item);
-                        }
-                      });
-
-                      await handleSaveChecklist(
-                        Array.from(categoriesMap.values()),
-                      );
+                      await handleSaveChecklistItems(items);
                     }}
                   />
                 )}

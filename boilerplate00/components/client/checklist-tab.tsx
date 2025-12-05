@@ -570,7 +570,38 @@ export default function ChecklistTab({
     });
   };
 
-  const currentItems = checklist.filter((item) => item.phase === activeTab);
+  const currentItems = checklist.filter((item) => {
+    // enum과 문자열 모두 비교 가능하도록
+    const itemPhase = String(item.phase);
+    const activePhase = String(activeTab);
+
+    // 디버깅 로그 추가
+    if (activeTab === TimelinePhase.SETTLEMENT_COMPLETE) {
+      console.log("[checklist-tab] SETTLEMENT_COMPLETE 필터링:", {
+        itemTitle: item.title,
+        itemPhase,
+        activePhase,
+        matches: itemPhase === activePhase,
+      });
+    }
+
+    return itemPhase === activePhase;
+  });
+
+  // 디버깅: 정착 완료 탭일 때 전체 체크리스트 확인
+  useEffect(() => {
+    if (activeTab === TimelinePhase.SETTLEMENT_COMPLETE) {
+      console.log("[checklist-tab] 정착 완료 탭 활성화:", {
+        activeTab,
+        totalChecklistItems: checklist.length,
+        settlementCompleteItems: checklist.filter(
+          (item) =>
+            String(item.phase) === String(TimelinePhase.SETTLEMENT_COMPLETE),
+        ),
+        currentItemsCount: currentItems.length,
+      });
+    }
+  }, [activeTab, checklist, currentItems.length]);
 
   // Stats
   const totalItems = checklist.length;

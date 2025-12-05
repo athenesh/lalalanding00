@@ -45,6 +45,7 @@ interface Listing {
   square_feet: number | null;
   title: string | null;
   thumbnail_url: string | null;
+  notes: string | null;
   created_at: string | null;
 }
 
@@ -433,6 +434,7 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
                 {row.map((listing) => (
                   <div key={listing.id} className="col-span-1 min-w-0">
                     <ListingCard
+                      id={listing.id}
                       address={listing.address}
                       price={listing.price}
                       bedrooms={listing.bedrooms}
@@ -441,6 +443,7 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
                       title={listing.title}
                       thumbnail_url={listing.thumbnail_url}
                       listing_url={listing.listing_url}
+                      notes={listing.notes}
                     />
                   </div>
                 ))}
