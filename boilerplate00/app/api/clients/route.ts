@@ -63,6 +63,7 @@ export async function GET() {
         phone_us,
         occupation,
         moving_date,
+        relocation_type,
         created_at,
         checklist_items (
           id,
@@ -98,7 +99,7 @@ export async function GET() {
       clientCount: clients?.length || 0,
     });
 
-    // 체크리스트 완료율 계산
+    // 체크리스트 완료율 및 프로필 완료 상태 계산
     const clientsWithProgress = clients?.map((client) => {
       const checklistItems = client.checklist_items || [];
       const totalItems = checklistItems.length;
@@ -108,17 +109,31 @@ export async function GET() {
       const completionRate =
         totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
 
+      // 프로필 작성 완료 상태 계산
+      // 필수 필드: name, email, occupation, moving_date, relocation_type
+      const isProfileComplete =
+        client.name &&
+        client.email &&
+        client.occupation &&
+        client.moving_date &&
+        client.relocation_type &&
+        client.name.trim() !== "" &&
+        client.email.trim() !== "" &&
+        client.occupation.trim() !== "" &&
+        client.relocation_type.trim() !== "";
+
       return {
         id: client.id,
         name: client.name,
         email: client.email,
-        phone: client.phone_kr || client.phone_us || null, // 수정
+        phone: client.phone_kr || client.phone_us || null,
         occupation: client.occupation,
         moving_date: client.moving_date,
         created_at: client.created_at,
         checklist_completion_rate: Math.round(completionRate),
         checklist_total: totalItems,
         checklist_completed: completedItems,
+        is_profile_complete: isProfileComplete,
       };
     });
 

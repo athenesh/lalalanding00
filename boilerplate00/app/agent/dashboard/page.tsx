@@ -15,6 +15,7 @@ interface Client {
   checklist_completion_rate: number;
   checklist_total: number;
   checklist_completed: number;
+  is_profile_complete?: boolean; // 추가
 }
 
 interface UnassignedClient {
@@ -266,6 +267,7 @@ export default function AgentDashboard() {
                       checklistCompletion={client.checklist_completion_rate}
                       checklistTotal={client.checklist_total}
                       checklistCompleted={client.checklist_completed}
+                      isProfileComplete={client.is_profile_complete} // 추가
                     />
                   ))}
                 </div>
