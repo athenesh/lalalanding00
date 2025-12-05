@@ -72,81 +72,77 @@ export function serializeDescription(
 
 /**
  * DB의 checklist_items Row를 UI의 ChecklistItem으로 변환
+ * 템플릿 기반 구조이므로 템플릿 정보도 필요합니다.
  */
 export function dbItemToUI(
   dbItem: Tables<"checklist_items">,
+  template: Tables<"checklist_templates">,
   files: ChecklistFile[] = [],
 ): ChecklistItem {
   return {
     id: dbItem.id,
-    title: dbItem.title,
-    category: dbItem.sub_category || "",
-    phase: dbCategoryToPhase(dbItem.category),
-    description: parseDescription(dbItem.description),
+    templateId: dbItem.template_id,
+    title: template.title,
+    category: template.sub_category || "",
+    phase: dbCategoryToPhase(template.category),
+    description: parseDescription(template.description),
     isCompleted: dbItem.is_completed || false,
     memo: dbItem.notes || "",
     files: files,
-    referenceUrl: dbItem.reference_url || undefined,
-    isRequired: dbItem.is_required || false,
+    referenceUrl: template.reference_url || dbItem.reference_url || undefined,
+    isRequired: template.is_required || false,
     completedAt: dbItem.completed_at
       ? new Date(dbItem.completed_at)
       : undefined,
-    orderNum: dbItem.order_num,
+    orderNum: template.order_num,
   };
 }
 
 /**
  * UI의 ChecklistItem을 DB 업데이트용 데이터로 변환
+ * 템플릿 기반 구조이므로 상태 정보만 업데이트합니다.
  */
 export function uiItemToDBUpdate(
   uiItem: ChecklistItem,
-  clientId: string,
 ): Partial<Tables<"checklist_items">> {
   return {
-    title: uiItem.title,
-    category: phaseToDbCategory(uiItem.phase),
-    sub_category: uiItem.category || null,
-    description: serializeDescription(uiItem.description),
     is_completed: uiItem.isCompleted,
     notes: uiItem.memo || null,
     reference_url: uiItem.referenceUrl || null,
-    is_required: uiItem.isRequired || false,
     completed_at:
       uiItem.isCompleted && uiItem.completedAt
         ? uiItem.completedAt.toISOString()
         : uiItem.isCompleted
         ? new Date().toISOString()
         : null,
-    order_num: uiItem.orderNum || 0,
   };
 }
 
 /**
  * UI의 ChecklistItem을 DB Insert용 데이터로 변환
+ * 템플릿 기반 구조이므로 template_id가 필수입니다.
  */
 export function uiItemToDBInsert(
   uiItem: Omit<ChecklistItem, "id">,
   clientId: string,
 ): Omit<Tables<"checklist_items">, "id" | "created_at"> {
+  if (!uiItem.templateId) {
+    throw new Error("templateId is required for checklist_items insert");
+  }
+
   return {
     client_id: clientId,
-    title: uiItem.title,
-    category: phaseToDbCategory(uiItem.phase),
-    sub_category: uiItem.category || null,
-    description: serializeDescription(uiItem.description),
+    template_id: uiItem.templateId,
     is_completed: uiItem.isCompleted || false,
     notes: uiItem.memo || null,
     reference_url: uiItem.referenceUrl || null,
-    is_required: uiItem.isRequired || false,
     completed_at:
       uiItem.isCompleted && uiItem.completedAt
         ? uiItem.completedAt.toISOString()
         : uiItem.isCompleted
         ? new Date().toISOString()
         : null,
-    order_num: uiItem.orderNum || 0,
     actual_cost: null,
-    template_id: null,
   };
 }
 

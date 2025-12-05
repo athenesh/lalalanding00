@@ -12,6 +12,13 @@ import HousingTab from "@/components/client/housing-tab";
 import ChecklistTab from "@/components/client/checklist-tab";
 import ChatTab from "@/components/client/chat-tab";
 import { useToast } from "@/hooks/use-toast";
+import {
+  ChecklistItem,
+  ChecklistItemContent,
+  TimelinePhase,
+  phaseToDbCategory,
+} from "@/types/checklist";
+import { serializeDescription } from "@/lib/checklist/transformers";
 
 // 타입 정의 (나중에 API로 교체 시 사용)
 interface ClientProfileData {
@@ -44,17 +51,6 @@ interface HousingData {
   additionalNotes: string;
 }
 
-interface ChecklistItem {
-  id: string;
-  title: string;
-  description: string[];
-  completed: boolean;
-  notes?: string;
-  referenceUrl?: string;
-  completedAt?: Date;
-  isRequired?: boolean;
-}
-
 interface ChecklistCategory {
   id: string;
   title: string;
@@ -62,8 +58,66 @@ interface ChecklistCategory {
   items: ChecklistItem[];
 }
 
-// 초기 체크리스트 데이터 (Mock)
-const initialChecklist: ChecklistCategory[] = [
+// 레거시 체크리스트 항목을 새로운 형식으로 변환
+function convertLegacyItem(
+  legacyItem: {
+    id: string;
+    title: string;
+    description: string[];
+    completed: boolean;
+    notes?: string;
+    referenceUrl?: string;
+    completedAt?: Date;
+    isRequired?: boolean;
+    orderNum?: number;
+  },
+  categoryId: string,
+): ChecklistItem {
+  // description을 ChecklistItemContent[]로 변환
+  const description: ChecklistItemContent[] = legacyItem.description.map(
+    (text) => ({ text }),
+  );
+
+  // categoryId를 phase로 변환
+  const phaseMap: Record<string, TimelinePhase> = {
+    "pre-departure": TimelinePhase.PRE_DEPARTURE,
+    arrival: TimelinePhase.ARRIVAL,
+    settlement: TimelinePhase.EARLY_SETTLEMENT,
+  };
+
+  return {
+    id: legacyItem.id,
+    title: legacyItem.title,
+    category: categoryId,
+    phase: phaseMap[categoryId] || TimelinePhase.PRE_DEPARTURE,
+    description,
+    isCompleted: legacyItem.completed,
+    memo: legacyItem.notes || "",
+    files: [],
+    referenceUrl: legacyItem.referenceUrl,
+    isRequired: legacyItem.isRequired || false,
+    completedAt: legacyItem.completedAt,
+    orderNum: legacyItem.orderNum,
+  };
+}
+
+// 초기 체크리스트 데이터 (Mock) - 레거시 형식
+const initialChecklistLegacy: Array<{
+  id: string;
+  title: string;
+  emoji: string;
+  items: Array<{
+    id: string;
+    title: string;
+    description: string[];
+    completed: boolean;
+    notes?: string;
+    referenceUrl?: string;
+    completedAt?: Date;
+    isRequired?: boolean;
+    orderNum?: number;
+  }>;
+}> = [
   {
     id: "pre-departure",
     title: "출국 전 준비 (7일 전)",
@@ -205,6 +259,14 @@ const initialChecklist: ChecklistCategory[] = [
   },
 ];
 
+// 레거시 데이터를 새로운 형식으로 변환
+const initialChecklist: ChecklistCategory[] = initialChecklistLegacy.map(
+  (category) => ({
+    ...category,
+    items: category.items.map((item) => convertLegacyItem(item, category.id)),
+  }),
+);
+
 export default function AgentClientDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -256,7 +318,8 @@ export default function AgentClientDetailPage() {
           throw new Error("Failed to load client data");
         }
 
-        const { client, familyMembers, emergencyContacts } = await response.json();
+        const { client, familyMembers, emergencyContacts } =
+          await response.json();
 
         // 클라이언트 데이터 로드 성공 로그
         console.log("[ClientDetail] 클라이언트 데이터 로드 성공:", {
@@ -267,24 +330,30 @@ export default function AgentClientDetailPage() {
         });
 
         // 프로필 데이터 변환
-        const transformedFamilyMembers = (familyMembers || []).map((member: any) => ({
-          id: member.id,
-          name: member.name,
-          relationship: member.relationship,
-          birthDate: member.birth_date ? new Date(member.birth_date) : undefined,
-          phone: member.phone || "",
-          email: member.email || "",
-          notes: member.notes || "",
-        }));
+        const transformedFamilyMembers = (familyMembers || []).map(
+          (member: any) => ({
+            id: member.id,
+            name: member.name,
+            relationship: member.relationship,
+            birthDate: member.birth_date
+              ? new Date(member.birth_date)
+              : undefined,
+            phone: member.phone || "",
+            email: member.email || "",
+            notes: member.notes || "",
+          }),
+        );
 
-        const transformedEmergencyContacts = (emergencyContacts || []).map((contact: any) => ({
-          id: contact.id,
-          name: contact.name,
-          relationship: contact.relationship,
-          phoneKr: contact.phone_kr || "",
-          email: contact.email || "",
-          kakaoId: contact.kakao_id || "",
-        }));
+        const transformedEmergencyContacts = (emergencyContacts || []).map(
+          (contact: any) => ({
+            id: contact.id,
+            name: contact.name,
+            relationship: contact.relationship,
+            phoneKr: contact.phone_kr || "",
+            email: contact.email || "",
+            kakaoId: contact.kakao_id || "",
+          }),
+        );
 
         setClientProfile({
           name: client.name,
@@ -342,6 +411,7 @@ export default function AgentClientDetailPage() {
               furnished: false,
               hasWasherDryer: false,
               parking: false,
+              parkingCount: "",
               hasPets: false,
               petDetails: "",
               schoolDistrict: false,
@@ -370,7 +440,10 @@ export default function AgentClientDetailPage() {
 
           // parking_count를 문자열로 변환 (4+ 같은 경우 처리)
           let parkingCountStr = "";
-          if (housing.parking_count !== null && housing.parking_count !== undefined) {
+          if (
+            housing.parking_count !== null &&
+            housing.parking_count !== undefined
+          ) {
             if (housing.parking_count >= 4) {
               parkingCountStr = "4+";
             } else {
@@ -494,8 +567,8 @@ export default function AgentClientDetailPage() {
                   return {
                     ...templateItem,
                     id: dbItem.id, // DB id 사용
-                    completed: dbItem.is_completed || false,
-                    notes: dbItem.notes || undefined,
+                    isCompleted: dbItem.is_completed || false,
+                    memo: dbItem.notes || "",
                     referenceUrl: dbItem.reference_url || undefined,
                     completedAt: dbItem.completed_at
                       ? new Date(dbItem.completed_at)
@@ -546,21 +619,23 @@ export default function AgentClientDetailPage() {
         relocation_type: data.relocationType,
         moving_type: data.movingType,
         birth_date: data.birthDate?.toISOString().split("T")[0] || null,
-        family_members: data.familyMembers?.map((member: any) => ({
-          name: member.name,
-          relationship: member.relationship,
-          birthDate: member.birthDate,
-          phone: member.phone,
-          email: member.email,
-          notes: member.notes,
-        })) || [],
-        emergency_contacts: data.emergencyContacts?.map((contact: any) => ({
-          name: contact.name,
-          relationship: contact.relationship,
-          phoneKr: contact.phoneKr,
-          email: contact.email,
-          kakaoId: contact.kakaoId,
-        })) || [],
+        family_members:
+          data.familyMembers?.map((member: any) => ({
+            name: member.name,
+            relationship: member.relationship,
+            birthDate: member.birthDate,
+            phone: member.phone,
+            email: member.email,
+            notes: member.notes,
+          })) || [],
+        emergency_contacts:
+          data.emergencyContacts?.map((contact: any) => ({
+            name: contact.name,
+            relationship: contact.relationship,
+            phoneKr: contact.phoneKr,
+            email: contact.email,
+            kakaoId: contact.kakaoId,
+          })) || [],
       };
 
       // API 호출 시작 로그
@@ -668,7 +743,10 @@ export default function AgentClientDetailPage() {
 
       // parking_count를 문자열로 변환 (4+ 같은 경우 처리)
       let parkingCountStr = "";
-      if (housing.parking_count !== null && housing.parking_count !== undefined) {
+      if (
+        housing.parking_count !== null &&
+        housing.parking_count !== undefined
+      ) {
         if (housing.parking_count >= 4) {
           parkingCountStr = "4+";
         } else {
@@ -728,12 +806,12 @@ export default function AgentClientDetailPage() {
         category.items.map((item) => ({
           id: item.id || undefined, // id가 없으면 undefined (API에서 생성)
           title: item.title,
-          category: category.id, // 카테고리 정보 포함
-          description: item.description,
-          completed: item.completed || false,
-          notes: item.notes || null,
+          category: phaseToDbCategory(item.phase), // phase를 DB category로 변환
+          description: serializeDescription(item.description), // ChecklistItemContent[]를 JSON 문자열로 직렬화
+          completed: item.isCompleted || false,
+          notes: item.memo || null,
           referenceUrl: item.referenceUrl || null,
-          completedAt: item.completed
+          completedAt: item.isCompleted
             ? item.completedAt instanceof Date
               ? item.completedAt.toISOString()
               : item.completedAt || new Date().toISOString()
@@ -761,7 +839,7 @@ export default function AgentClientDetailPage() {
       } catch (fetchError) {
         console.error("[ClientDetail] 네트워크 에러:", fetchError);
         throw new Error(
-          "서버에 연결할 수 없습니다. 개발 서버가 실행 중인지 확인해주세요."
+          "서버에 연결할 수 없습니다. 개발 서버가 실행 중인지 확인해주세요.",
         );
       }
 
@@ -801,15 +879,16 @@ export default function AgentClientDetailPage() {
               ? updatedItemsMap.get(item.id)
               : updated.find(
                   (u: any) =>
-                    u.title === item.title && u.category === category.id.replace("-", "_")
+                    u.title === item.title &&
+                    u.category === category.id.replace("-", "_"),
                 );
 
             if (updatedItem) {
               return {
                 ...item,
                 id: updatedItem.id, // 새로 생성된 id 반영
-                completed: updatedItem.is_completed || false,
-                notes: updatedItem.notes || undefined,
+                isCompleted: updatedItem.is_completed || false,
+                memo: updatedItem.notes || "",
                 referenceUrl: updatedItem.reference_url || undefined,
                 completedAt: updatedItem.completed_at
                   ? new Date(updatedItem.completed_at)
@@ -968,8 +1047,42 @@ export default function AgentClientDetailPage() {
                   </div>
                 ) : (
                   <ChecklistTab
-                    initialData={checklistData}
-                    onSave={handleSaveChecklist}
+                    initialData={checklistData.flatMap(
+                      (category) => category.items,
+                    )}
+                    onSave={async (items: ChecklistItem[]) => {
+                      // ChecklistItem[]를 ChecklistCategory[]로 변환
+                      const categoriesMap = new Map<
+                        string,
+                        ChecklistCategory
+                      >();
+
+                      // 기존 카테고리 구조 유지
+                      checklistData.forEach((category) => {
+                        categoriesMap.set(category.id, {
+                          ...category,
+                          items: [],
+                        });
+                      });
+
+                      // items를 카테고리별로 그룹화
+                      items.forEach((item) => {
+                        // item의 category나 phase를 사용하여 카테고리 찾기
+                        const categoryId =
+                          checklistData.find((cat) =>
+                            cat.items.some((catItem) => catItem.id === item.id),
+                          )?.id || checklistData[0]?.id;
+
+                        const category = categoriesMap.get(categoryId);
+                        if (category) {
+                          category.items.push(item);
+                        }
+                      });
+
+                      await handleSaveChecklist(
+                        Array.from(categoriesMap.values()),
+                      );
+                    }}
                   />
                 )}
               </TabsContent>

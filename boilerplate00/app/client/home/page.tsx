@@ -601,10 +601,10 @@ export default function ClientHomePage() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center space-y-2">
+          <div className="grid grid-cols-4 gap-4">
+            <Card className="col-span-1">
+              <CardContent className="p-6 pt-6 h-full flex flex-col justify-center">
+                <div className="text-center space-y-4">
                   <Calendar className="h-12 w-12 mx-auto text-primary" />
                   <div className="text-4xl font-bold text-primary">
                     D-{daysUntilMoving}
@@ -619,8 +619,8 @@ export default function ClientHomePage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="pt-6">
+            <Card className="col-span-3">
+              <CardContent className="p-6 pt-6">
                 <div className="space-y-4">
                   <div className="text-center">
                     <div className="text-4xl font-bold text-success">
@@ -628,10 +628,21 @@ export default function ClientHomePage() {
                     </div>
                     <p className="text-muted-foreground mt-2">준비 진행도</p>
                   </div>
-                  <Progress
-                    value={clientData.checklistCompletion}
-                    className="h-3"
-                  />
+                  <div
+                    aria-valuemax={100}
+                    aria-valuemin={0}
+                    role="progressbar"
+                    className="bg-primary/20 relative w-full overflow-hidden rounded-full h-3"
+                  >
+                    <div
+                      className="bg-primary h-full w-full flex-1 transition-all"
+                      style={{
+                        transform: `translateX(-${
+                          100 - clientData.checklistCompletion
+                        }%)`,
+                      }}
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>

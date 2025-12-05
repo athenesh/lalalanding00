@@ -343,6 +343,31 @@
 - [ ] 부동산 정보 캐싱 기능 (중복 요청 방지)
 - [ ] 여러 Zillow 링크 처리 로직 (메시지에 여러 링크가 있는 경우)
 
+### 리스팅 이미지 추출 및 카드 표시
+
+- [ ] 이미지 추출 서버 액션 생성 (`actions/extract-listing-image.ts`)
+  - [ ] Redfin/Zillow URL에서 og:image 메타 태그 추출
+  - [ ] 페이지의 첫 번째 이미지 찾기 (fallback)
+  - [ ] 에러 처리 및 타임아웃 설정 (5초)
+  - [ ] User-Agent 헤더 설정 (일부 사이트 차단 방지)
+- [ ] Gemini 리스팅 액션에 이미지 추출 통합 (`actions/gemini-listing.ts`)
+  - [ ] `fetchListingFromText`에서 리스팅 URL이 있을 때 이미지 추출 호출
+  - [ ] 이미지 추출 실패 시에도 리스팅 정보는 저장 (graceful degradation)
+- [ ] Next.js Image 설정 업데이트 (`next.config.ts`)
+  - [ ] Redfin, Zillow 이미지 도메인을 `remotePatterns`에 추가
+  - [ ] 예: `redfin.com`, `zillowstatic.com`, `zillow.com` 등
+- [ ] ListingCard 컴포넌트에 이미지 표시 (`components/client/listing-card.tsx`)
+  - [ ] `thumbnail_url`이 있을 때 카드 상단에 이미지 표시
+  - [ ] Next.js `Image` 컴포넌트 사용 (최적화, lazy loading)
+  - [ ] 이미지 로딩 상태 처리
+  - [ ] 이미지 없을 때 fallback (현재 cyan 헤더 유지)
+  - [ ] 반응형 이미지 크기 조정 (aspect-ratio: 16:9 또는 4:3)
+  - [ ] 이미지 클릭 시 원본 링크로 이동 (선택적)
+- [ ] 성능 최적화
+  - [ ] 이미지 캐싱 (같은 URL의 이미지는 재추출하지 않도록)
+  - [ ] Rate limiting (너무 많은 요청 방지)
+  - [ ] Next.js Image의 자동 최적화 활용
+
 ---
 
 ## 우선순위별 정리

@@ -17,7 +17,6 @@ import {
   Home,
   Car,
   Flag,
-  Calendar,
   Paperclip,
   FileText,
   Image as ImageIcon,
@@ -33,48 +32,6 @@ interface ChecklistTabProps {
   onSave?: (items: ChecklistItem[]) => Promise<void>; // 저장 핸들러
   isLoading?: boolean; // 로딩 상태
 }
-
-// D-Day Card 컴포넌트
-const DDayCard = ({ movingDate }: { movingDate?: string }) => {
-  const daysUntilMoving = movingDate
-    ? Math.ceil(
-        (new Date(movingDate).getTime() - new Date().getTime()) /
-          (1000 * 60 * 60 * 24),
-      )
-    : 0;
-
-  return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center h-48 w-full">
-      <Calendar className="w-8 h-8 text-slate-800 mb-2" />
-      <div className="text-4xl font-bold text-slate-800 mb-1">
-        D-{daysUntilMoving}
-      </div>
-      <div className="text-sm text-slate-500">이주까지</div>
-      {movingDate && (
-        <div className="text-sm text-slate-400 mt-2">
-          {new Date(movingDate).toLocaleDateString("ko-KR")}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Progress Card 컴포넌트
-const ProgressCard = ({ percent }: { percent: number }) => {
-  return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center h-48 w-full">
-      <div className="text-4xl font-bold text-green-500 mb-1">{percent}%</div>
-      <div className="text-sm text-slate-500 mb-6">준비 진행도</div>
-
-      <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-        <div
-          className="bg-slate-300 h-3 rounded-full transition-all duration-1000"
-          style={{ width: `${percent}%` }}
-        />
-      </div>
-    </div>
-  );
-};
 
 // ChecklistRow 컴포넌트 - 개별 체크리스트 항목
 const ChecklistRow = ({
@@ -97,29 +54,179 @@ const ChecklistRow = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const memoDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const newFile: ChecklistFile = {
-        id: Math.random().toString(36).substr(2, 9),
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0]) return;
+
+    const file = e.target.files[0];
+    const itemId = item.id || item.templateId;
+
+    if (!itemId) {
+      console.error("[checklist-tab] 체크리스트 항목 ID가 없습니다.");
+      return;
+    }
+
+    // 로딩 상태 표시를 위한 임시 파일 추가
+    const tempFile: ChecklistFile = {
+      id: `temp-${Date.now()}`,
+      name: file.name,
+      type: file.type,
+      url: URL.createObjectURL(file), // 임시 미리보기용
+      timestamp: Date.now(),
+    };
+
+    // 낙관적 업데이트: 즉시 UI에 표시 (저장하지 않음)
+    onUpdateItem(
+      itemId,
+      {
+        files: [...item.files, tempFile],
+      },
+      false,
+    ); // shouldSave = false로 설정하여 서버 저장 방지
+
+    try {
+      console.log("[checklist-tab] 파일 업로드 시작:", {
+        fileName: file.name,
+        fileSize: file.size,
+        itemId,
+      });
+
+      // FormData 생성
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("item_id", itemId);
+
+      // API 호출
+      const response = await fetch("/api/client/checklist/files", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "파일 업로드 실패");
+      }
+
+      const result = await response.json();
+      console.log("[checklist-tab] 파일 업로드 성공:", result);
+
+      // 임시 파일을 실제 파일로 교체
+      const uploadedFile: ChecklistFile = {
+        id: result.documentId || tempFile.id,
         name: file.name,
         type: file.type,
-        url: URL.createObjectURL(file), // 로컬 URL만 사용 (Phase 1)
+        url: result.fileUrl || tempFile.url,
         timestamp: Date.now(),
+        file_url: result.fileUrl,
+        document_id: result.documentId,
       };
 
-      onUpdateItem(item.id || item.templateId!, {
-        files: [...item.files, newFile],
-      });
+      // 임시 파일 제거하고 실제 파일 추가 (저장하지 않음)
+      const updatedFiles = item.files
+        .filter((f) => f.id !== tempFile.id)
+        .concat(uploadedFile);
+
+      onUpdateItem(
+        itemId,
+        {
+          files: updatedFiles,
+        },
+        false,
+      ); // shouldSave = false로 설정하여 서버 저장 방지
+    } catch (error) {
+      console.error("[checklist-tab] 파일 업로드 실패:", error);
+
+      // 에러 발생 시 임시 파일 제거
+      const updatedFiles = item.files.filter((f) => f.id !== tempFile.id);
+      onUpdateItem(
+        itemId,
+        {
+          files: updatedFiles,
+        },
+        false,
+      ); // shouldSave = false로 설정
+
+      // 사용자에게 에러 알림
+      alert(
+        `파일 업로드 실패: ${
+          error instanceof Error ? error.message : "알 수 없는 오류"
+        }`,
+      );
+    } finally {
       // Reset input
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const handleDeleteFile = (fileId: string) => {
-    onUpdateItem(item.id || item.templateId!, {
-      files: item.files.filter((f) => f.id !== fileId),
+  const handleDeleteFile = async (fileId: string) => {
+    const file = item.files.find((f) => f.id === fileId);
+    if (!file) return;
+
+    const itemId = item.id || item.templateId;
+    if (!itemId) return;
+
+    // 낙관적 업데이트: 즉시 UI에서 제거
+    const updatedFiles = item.files.filter((f) => f.id !== fileId);
+    onUpdateItem(itemId, {
+      files: updatedFiles,
     });
+
+    // 임시 파일이면 서버 삭제 불필요
+    if (fileId.startsWith("temp-")) {
+      return;
+    }
+
+    // 실제 파일이면 Supabase에서도 삭제
+    if (file.document_id && file.file_url) {
+      try {
+        console.log("[checklist-tab] 파일 삭제 시작:", {
+          documentId: file.document_id,
+          fileUrl: file.file_url,
+        });
+
+        // file_url에서 경로 추출
+        // 예: https://xxx.supabase.co/storage/v1/object/public/uploads/user_id/checklist/item_id/filename.jpg
+        // -> user_id/checklist/item_id/filename.jpg
+        const urlParts = file.file_url.split("/uploads/");
+        const filePath = urlParts.length > 1 ? urlParts[1] : null;
+
+        if (!filePath) {
+          console.error(
+            "[checklist-tab] 파일 경로를 추출할 수 없습니다:",
+            file.file_url,
+          );
+          return;
+        }
+
+        const response = await fetch(
+          `/api/client/checklist/files?document_id=${
+            file.document_id
+          }&file_path=${encodeURIComponent(filePath)}`,
+          {
+            method: "DELETE",
+          },
+        );
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "파일 삭제 실패");
+        }
+
+        console.log("[checklist-tab] 파일 삭제 성공:", file.document_id);
+      } catch (error) {
+        console.error("[checklist-tab] 파일 삭제 실패:", error);
+
+        // 에러 발생 시 파일 다시 추가
+        onUpdateItem(itemId, {
+          files: [...updatedFiles, file],
+        });
+
+        alert(
+          `파일 삭제 실패: ${
+            error instanceof Error ? error.message : "알 수 없는 오류"
+          }`,
+        );
+      }
+    }
   };
 
   const handleMemoChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -530,31 +637,6 @@ export default function ChecklistTab({
           저장 중...
         </div>
       )}
-
-      {/* Top Dashboard Widgets */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <DDayCard movingDate={movingDate} />
-        <ProgressCard percent={globalProgress} />
-      </div>
-
-      {/* Global Progress Bar Section */}
-      <div className="mb-10 animate-fadeIn">
-        <div className="flex justify-between items-end mb-2">
-          <h2 className="text-lg font-bold">전체 진행률</h2>
-          <span className="text-2xl font-bold text-slate-900">
-            {globalProgress}%
-          </span>
-        </div>
-        <div className="w-full bg-slate-200 rounded-full h-4 overflow-hidden mb-2">
-          <div
-            className="bg-slate-900 h-4 rounded-full transition-all duration-1000 ease-out"
-            style={{ width: `${globalProgress}%` }}
-          />
-        </div>
-        <div className="text-xs text-slate-500">
-          {completedItems}/{totalItems} 완료
-        </div>
-      </div>
 
       {/* Phase Navigation Tabs */}
       <div className="flex justify-between items-center mb-8 px-4">
