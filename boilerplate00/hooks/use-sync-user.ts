@@ -7,7 +7,7 @@ import { useEffect, useRef } from "react";
  * Clerk 사용자를 Supabase DB에 자동으로 동기화하는 훅
  *
  * 사용자가 로그인한 상태에서 이 훅을 사용하면
- * 자동으로 /api/sync-user를 호출하여 Supabase users 테이블에 사용자 정보를 저장합니다.
+ * 자동으로 /api/sync-user를 호출하여 Supabase accounts 테이블에 사용자 정보를 저장합니다.
  *
  * @example
  * ```tsx
