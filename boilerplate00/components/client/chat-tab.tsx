@@ -107,11 +107,32 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
 
         const data = await response.json();
         const newMessages = data.messages || [];
-        const newListings = data.listings || [];
+        const rawListings = data.listings || [];
+
+        // 리스팅 데이터 타입 정규화 (bathrooms, bedrooms, price, square_feet를 숫자로 변환)
+        const normalizedListings = rawListings.map((listing: any) => ({
+          ...listing,
+          bathrooms:
+            typeof listing.bathrooms === "string"
+              ? parseFloat(listing.bathrooms) || null
+              : listing.bathrooms,
+          bedrooms:
+            typeof listing.bedrooms === "string"
+              ? parseInt(listing.bedrooms, 10) || null
+              : listing.bedrooms,
+          price:
+            typeof listing.price === "string"
+              ? parseFloat(listing.price) || null
+              : listing.price,
+          square_feet:
+            typeof listing.square_feet === "string"
+              ? parseInt(listing.square_feet, 10) || null
+              : listing.square_feet,
+        }));
 
         // 데이터 깊은 비교
         const newMessagesData = JSON.stringify(newMessages);
-        const newListingsData = JSON.stringify(newListings);
+        const newListingsData = JSON.stringify(normalizedListings);
 
         const messagesChanged = hasDataChanged(
           prevMessagesDataRef.current,
@@ -122,18 +143,26 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
           newListingsData,
         );
 
-        // 데이터가 실제로 변경된 경우에만 상태 업데이트
-        if (messagesChanged || listingsChanged || isInitial) {
+        // 데이터가 실제로 변경된 경우 또는 리스팅이 있을 때 항상 상태 업데이트
+        // (리스팅이 있으면 폴링 최적화를 우회하여 항상 표시되도록)
+        const shouldUpdate =
+          messagesChanged ||
+          listingsChanged ||
+          isInitial ||
+          normalizedListings.length > 0;
+
+        if (shouldUpdate) {
           setMessages(newMessages);
-          setListings(newListings);
+          setListings(normalizedListings);
           prevMessagesDataRef.current = newMessagesData;
           prevListingsDataRef.current = newListingsData;
 
           console.log("[ChatTab] 메시지 로드 성공:", {
             messageCount: newMessages.length,
-            listingCount: newListings.length,
+            listingCount: normalizedListings.length,
             messagesChanged,
             listingsChanged,
+            shouldUpdate,
           });
         } else {
           console.log("[ChatTab] 데이터 변경 없음, 상태 업데이트 스킵");
@@ -226,15 +255,17 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
       // 입력 필드 초기화
       setInputValue("");
 
-      // 메시지 목록 새로고침 (초기 로드가 아니므로 false)
-      await loadMessages(false);
-
-      // 리스팅이 생성된 경우 알림
+      // 리스팅이 생성된 경우 강제 업데이트 (isInitial을 true로 설정)
       if (data.listing_id) {
         toast({
           title: "리스팅 정보 추가됨",
           description: "부동산 정보가 카드로 표시되었습니다.",
         });
+        // 리스팅이 생성되었으면 강제로 다시 로드 (isInitial을 true로 설정)
+        await loadMessages(true);
+      } else {
+        // 리스팅이 없으면 일반 로드
+        await loadMessages(false);
       }
     } catch (error) {
       console.error("[ChatTab] 메시지 전송 실패:", error);
@@ -288,34 +319,31 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
     return content.length >= 25;
   };
 
-  // 역순 그리드 레이아웃을 위한 리스팅 정렬
-  // 가장 최근 리스팅이 마지막에 오도록 정렬 (created_at 기준)
+  // 그리드 레이아웃을 위한 리스팅 정렬
+  // 가장 최신 리스팅이 첫 번째에 오도록 정렬 (created_at 기준, 최신->오래된 순서)
   const sortedListings = [...listings].sort((a, b) => {
     const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
     const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-    return timeA - timeB; // 오래된 것부터 최신 순서
+    return timeB - timeA; // 최신부터 오래된 순서
   });
 
-  // 역순 그리드 레이아웃: 5개 이상이면 첫 행에 5번째, 둘째 행에 1-4번째
-  const getGridLayout = () => {
-    if (sortedListings.length === 0) return { topRow: [], bottomRow: [] };
+  // 그리드 레이아웃을 위한 행 분할
+  // 4개씩 묶어서 행으로 만들기
+  // sortedListings는 이미 최신->오래된 순서이므로, 각 행은 그대로 사용
+  // CSS Grid는 왼쪽->오른쪽으로 채워지므로, [16,15,14,13] 순서면 왼쪽에 16, 오른쪽에 13이 됨
+  const getGridRows = () => {
+    const rows: Listing[][] = [];
+    const itemsPerRow = 4;
 
-    if (sortedListings.length >= 5) {
-      // 5개 이상: 첫 행에 5번째 (index 4), 둘째 행에 1-4번째 (index 0-3)
-      return {
-        topRow: [sortedListings[4]],
-        bottomRow: sortedListings.slice(0, 4),
-      };
-    } else {
-      // 4개 이하: 둘째 행에만 표시
-      return {
-        topRow: [],
-        bottomRow: sortedListings,
-      };
+    for (let i = 0; i < sortedListings.length; i += itemsPerRow) {
+      rows.push(sortedListings.slice(i, i + itemsPerRow));
     }
+
+    // 행들은 위에서 아래로 배치 (정순)
+    return rows;
   };
 
-  const { topRow, bottomRow } = getGridLayout();
+  const gridRows = getGridRows();
 
   return (
     <div className="flex flex-col min-h-[500px] max-h-[700px] bg-background rounded-lg border border-border w-full">
@@ -393,33 +421,16 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
         </div>
       </div>
 
-      {/* 리스팅 카드 섹션 (입력창 아래, 역순 그리드 레이아웃) */}
+      {/* 리스팅 카드 섹션 (입력창 아래, 최신이 상단 왼쪽, 오래된 것이 하단 오른쪽) */}
       {sortedListings.length > 0 && (
         <div className="p-4 border-t border-border bg-muted/30 max-w-full">
-          <div className="space-y-4">
-            {/* 첫 행: 5번째 카드 (5개 이상인 경우만) */}
-            {topRow.length > 0 && (
-              <div className="grid grid-cols-4 gap-1 sm:gap-2 md:gap-4">
-                <div className="col-span-1 min-w-0">
-                  <ListingCard
-                    key={topRow[0].id}
-                    address={topRow[0].address}
-                    price={topRow[0].price}
-                    bedrooms={topRow[0].bedrooms}
-                    bathrooms={topRow[0].bathrooms}
-                    square_feet={topRow[0].square_feet}
-                    title={topRow[0].title}
-                    thumbnail_url={topRow[0].thumbnail_url}
-                    listing_url={topRow[0].listing_url}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* 둘째 행: 1-4번째 카드 (또는 모든 카드) */}
-            {bottomRow.length > 0 && (
-              <div className="grid grid-cols-4 gap-1 sm:gap-2 md:gap-4">
-                {bottomRow.map((listing) => (
+          <div className="flex flex-col gap-1 sm:gap-2 md:gap-4">
+            {gridRows.map((row, rowIndex) => (
+              <div
+                key={rowIndex}
+                className="grid grid-cols-4 gap-1 sm:gap-2 md:gap-4"
+              >
+                {row.map((listing) => (
                   <div key={listing.id} className="col-span-1 min-w-0">
                     <ListingCard
                       address={listing.address}
@@ -434,7 +445,7 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
                   </div>
                 ))}
               </div>
-            )}
+            ))}
           </div>
         </div>
       )}

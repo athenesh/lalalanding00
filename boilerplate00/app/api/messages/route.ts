@@ -271,23 +271,46 @@ export async function POST(request: Request) {
             insertData.square_feet = listingData.square_feet;
           }
 
-          const { data: listing, error: listingError } = await supabase
+          // 중복 체크: 같은 채팅방에 같은 listing_url이 이미 존재하는지 확인
+          const { data: existingListing, error: checkError } = await supabase
             .from("shared_listings")
-            .insert(insertData)
             .select("id")
+            .eq("room_id", roomId)
+            .eq("listing_url", listingData.listing_url)
             .single();
 
-          if (!listingError && listing) {
-            listingId = listing.id;
-            console.log("[API] 리스팅 정보 저장 성공:", {
-              listingId,
+          if (checkError && checkError.code !== "PGRST116") {
+            // PGRST116은 "no rows returned" 에러 (정상적인 경우)
+            console.error("[API] 리스팅 중복 체크 실패:", checkError);
+          }
+
+          if (existingListing) {
+            console.log("[API] 이미 존재하는 리스팅 URL, 중복 저장 스킵:", {
+              listingUrl: listingData.listing_url,
               roomId,
             });
+            // 중복이므로 저장하지 않고 기존 ID 사용
+            listingId = existingListing.id;
           } else {
-            console.error("[API] 리스팅 정보 저장 실패:", {
-              error: listingError,
-              listingData,
-            });
+            // 중복이 아니므로 새로 저장
+            const { data: listing, error: listingError } = await supabase
+              .from("shared_listings")
+              .insert(insertData)
+              .select("id")
+              .single();
+
+            if (!listingError && listing) {
+              listingId = listing.id;
+              console.log("[API] 리스팅 정보 저장 성공:", {
+                listingId,
+                roomId,
+              });
+            } else {
+              console.error("[API] 리스팅 정보 저장 실패:", {
+                error: listingError,
+                listingData,
+              });
+            }
           }
         } else {
           console.log("[API] Gemini API가 리스팅 정보를 추출하지 못함 (null 반환)");

@@ -217,3 +217,4 @@ export async function fetchListingByAddress(address: string): Promise<ListingDat
   return searchListingByAddress(address);
 }
 
+

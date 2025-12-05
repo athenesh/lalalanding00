@@ -12,3 +12,4 @@ WHERE square_feet IS NOT NULL;
 -- 코멘트 추가
 COMMENT ON COLUMN public.shared_listings.square_feet IS '부동산 평수 (제곱피트, sqft)';
 
+
