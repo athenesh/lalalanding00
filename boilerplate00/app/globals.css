@@ -152,7 +152,12 @@
   main {
     @apply max-w-7xl mx-auto pt-16 px-4;
   }
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-semibold;
   }
 }
@@ -171,10 +176,10 @@
   }
 
   .chat-bubble-agent {
-    @apply bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-4 py-2 max-w-[70%] ml-auto;
+    @apply bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-4 py-2 ml-auto;
   }
 
   .chat-bubble-client {
-    @apply bg-muted text-foreground rounded-2xl rounded-tl-sm px-4 py-2 max-w-[70%];
+    @apply bg-muted text-foreground rounded-2xl rounded-tl-sm px-4 py-2;
   }
 }

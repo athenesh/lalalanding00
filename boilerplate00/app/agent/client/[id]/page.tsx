@@ -1088,7 +1088,7 @@ export default function AgentClientDetailPage() {
               </TabsContent>
 
               <TabsContent value="chat" className="space-y-6">
-                <ChatTab userType="agent" />
+                <ChatTab userType="agent" clientId={clientId} />
               </TabsContent>
             </div>
           </Tabs>

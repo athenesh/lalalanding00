@@ -283,6 +283,11 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
     });
   };
 
+  // 메시지 길이에 따라 줄바꿈 여부 결정 (25글자 이상일 때만 줄바꿈)
+  const shouldWrapMessage = (content: string) => {
+    return content.length >= 25;
+  };
+
   // 역순 그리드 레이아웃을 위한 리스팅 정렬
   // 가장 최근 리스팅이 마지막에 오도록 정렬 (created_at 기준)
   const sortedListings = [...listings].sort((a, b) => {
@@ -313,8 +318,8 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
   const { topRow, bottomRow } = getGridLayout();
 
   return (
-    <div className="flex flex-col h-[600px] bg-background rounded-lg border border-border">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex flex-col min-h-[500px] max-h-[700px] bg-background rounded-lg border border-border w-full">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[360px]">
         {isLoading ? (
           <div className="text-center py-8">
             <p className="text-muted-foreground">메시지를 불러오는 중...</p>
@@ -339,8 +344,11 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
                 >
                   <div
                     className={cn(
-                      "flex flex-col max-w-[80%]",
+                      "flex flex-col",
                       isOwnMessage ? "items-end" : "items-start",
+                      shouldWrapMessage(message.content)
+                        ? "max-w-[80%] md:max-w-[60%] lg:max-w-[50%]"
+                        : "max-w-fit",
                     )}
                   >
                     <div
@@ -349,6 +357,9 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
                         isOwnMessage
                           ? "chat-bubble-agent"
                           : "chat-bubble-client",
+                        shouldWrapMessage(message.content)
+                          ? "break-words"
+                          : "whitespace-nowrap",
                       )}
                     >
                       {message.content}
