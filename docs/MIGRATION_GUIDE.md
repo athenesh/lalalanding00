@@ -1,6 +1,9 @@
 # 데이터베이스 마이그레이션 적용 가이드
 
+> **참고**: `boilerplate00` 폴더의 모든 파일들은 `lalalanding0` 프로젝트로 이전되었습니다. 현재 프로젝트 루트(`lalalanding0`)에서 작업을 진행하시면 됩니다.
+
 ## 마이그레이션 파일
+
 `supabase/migrations/create_main_schema.sql`
 
 ## 적용 방법
@@ -16,8 +19,9 @@
 
 ### 방법 2: Supabase CLI 사용
 
+프로젝트 루트(`lalalanding0`)에서 실행:
+
 ```bash
-cd boilerplate00
 supabase db push
 ```
 
@@ -38,6 +42,6 @@ supabase db execute -f supabase/migrations/create_main_schema.sql
 ## 확인 방법
 
 마이그레이션 적용 후:
+
 1. Supabase Dashboard → **Table Editor**에서 테이블들이 생성되었는지 확인
 2. 애플리케이션을 다시 실행하고 테스트
-

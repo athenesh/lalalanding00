@@ -237,6 +237,44 @@ export type Database = {
         }
         Relationships: []
       }
+      client_authorizations: {
+        Row: {
+          authorized_clerk_user_id: string
+          client_id: string
+          created_at: string
+          granted_at: string
+          granted_by_clerk_user_id: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          authorized_clerk_user_id: string
+          client_id: string
+          created_at?: string
+          granted_at?: string
+          granted_by_clerk_user_id: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          authorized_clerk_user_id?: string
+          client_id?: string
+          created_at?: string
+          granted_at?: string
+          granted_by_clerk_user_id?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_authorizations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_documents: {
         Row: {
           client_id: string
@@ -536,6 +574,7 @@ export type Database = {
           created_at: string | null
           id: string
           is_bookmarked: boolean | null
+          is_excluded: boolean
           listing_url: string
           notes: string | null
           price: number | null
@@ -552,6 +591,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_bookmarked?: boolean | null
+          is_excluded?: boolean
           listing_url: string
           notes?: string | null
           price?: number | null
@@ -568,6 +608,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_bookmarked?: boolean | null
+          is_excluded?: boolean
           listing_url?: string
           notes?: string | null
           price?: number | null
@@ -613,7 +654,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_authorization_exists: {
+        Args: { clerk_user_id: string; client_uuid: string }
+        Returns: boolean
+      }
+      check_client_ownership: {
+        Args: { clerk_user_id: string; client_uuid: string }
+        Returns: boolean
+      }
       db_to_ui_category: { Args: { db_category: string }; Returns: string }
+      debug_jwt_claims: {
+        Args: never
+        Returns: {
+          all_claims: Json
+          role: string
+          sub: string
+        }[]
+      }
       get_checklist_progress: {
         Args: { p_client_id: string }
         Returns: {

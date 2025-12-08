@@ -1,5 +1,0 @@
-{
-  "name": "Listing Card Generator",
-  "description": "Instantly generate a summary card from real estate listing text using Gemini.",
-  "requestFramePermissions": []
-}
