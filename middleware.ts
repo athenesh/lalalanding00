@@ -76,17 +76,19 @@ export default clerkMiddleware(async (auth, req) => {
         // role이 없으면 일단 허용하고, 페이지에서 클라이언트 사이드로 체크
       }
 
-      // 클라이언트 전용 라우트 - role이 명확히 다른 역할인 경우만 차단
-      // role이 없거나 undefined인 경우는 페이지에서 클라이언트 사이드로 체크하도록 허용
+      // 클라이언트 전용 라우트 - role이 명확히 다른 역할(agent)인 경우만 차단
+      // role이 없거나 undefined인 경우는 권한 부여된 사용자일 수 있으므로 페이지에서 체크하도록 허용
       if (pathname.startsWith("/client")) {
-        if (role && role !== "client") {
-          // 보안 로그 (민감한 정보 제외)
+        if (role === "agent") {
+          // 에이전트는 클라이언트 라우트 접근 불가
           console.warn(
-            `[Middleware] Access denied: role mismatch for ${pathname}`,
+            `[Middleware] Access denied: agent cannot access client routes for ${pathname}`,
           );
           return NextResponse.redirect(new URL("/", req.url));
         }
-        // role이 없으면 일단 허용하고, 페이지에서 클라이언트 사이드로 체크
+        // role이 "client"이거나 없으면 일단 허용
+        // - role이 "client": 클라이언트 본인
+        // - role이 없음: 권한 부여된 사용자일 수 있음 (페이지에서 확인)
       }
     }
   } catch (error) {

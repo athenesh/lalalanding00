@@ -1,27 +1,34 @@
 import { NextResponse } from "next/server";
-import { getAuthUserId, requireClient } from "@/lib/auth";
+import { getClientIdForUser, requireClientOrAuthorized } from "@/lib/auth";
 import { createClerkSupabaseClient } from "@/lib/supabase/server";
 import { updateClientProfileSchema } from "@/lib/validations/api-schemas";
 
 /**
  * GET /api/client/profile
  * 클라이언트 자신의 프로필 정보를 조회합니다.
+ * 권한 부여된 사용자도 접근 가능합니다.
  */
 export async function GET() {
   try {
     console.log("[API] GET /api/client/profile 호출");
 
-    // 클라이언트 권한 확인
-    await requireClient();
+    // 클라이언트 또는 권한 부여된 사용자 확인
+    await requireClientOrAuthorized();
 
-    const userId = await getAuthUserId();
     const supabase = createClerkSupabaseClient();
 
-    // 클라이언트 정보 조회 (clerk_user_id로)
+    // 클라이언트 본인 또는 권한 부여된 사용자의 client_id 조회
+    const clientId = await getClientIdForUser();
+
+    if (!clientId) {
+      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+    }
+
+    // 클라이언트 정보 조회 (client_id로)
     const { data: client, error: clientError } = await supabase
       .from("clients")
       .select("*")
-      .eq("clerk_user_id", userId)
+      .eq("id", clientId)
       .single();
 
     if (clientError) {
@@ -34,12 +41,12 @@ export async function GET() {
         console.warn("[API] Client not found:", { userId });
         return NextResponse.json(
           { error: "Client not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
       return NextResponse.json(
         { error: "Failed to fetch client" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -60,7 +67,10 @@ export async function GET() {
       .eq("client_id", client.id);
 
     if (emergencyError) {
-      console.error("[API] Failed to fetch emergency contacts:", emergencyError);
+      console.error(
+        "[API] Failed to fetch emergency contacts:",
+        emergencyError,
+      );
     }
 
     console.log("[API] Client profile 조회 성공:", {
@@ -80,7 +90,7 @@ export async function GET() {
     });
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -88,34 +98,38 @@ export async function GET() {
 /**
  * PATCH /api/client/profile
  * 클라이언트 자신의 프로필 정보를 수정합니다.
+ * 권한 부여된 사용자도 수정 가능합니다.
  */
 export async function PATCH(request: Request) {
   try {
     console.log("[API] PATCH /api/client/profile 호출");
 
-    // 클라이언트 권한 확인
-    await requireClient();
+    // 클라이언트 또는 권한 부여된 사용자 확인
+    await requireClientOrAuthorized();
 
-    const userId = await getAuthUserId();
     const supabase = createClerkSupabaseClient();
 
-    // 클라이언트 정보 조회 (clerk_user_id로)
+    // 클라이언트 본인 또는 권한 부여된 사용자의 client_id 조회
+    const clientId = await getClientIdForUser();
+
+    if (!clientId) {
+      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+    }
+
+    // 클라이언트 정보 조회 (client_id로)
     const { data: existingClient, error: fetchError } = await supabase
       .from("clients")
       .select("id")
-      .eq("clerk_user_id", userId)
+      .eq("id", clientId)
       .single();
 
     if (fetchError || !existingClient) {
       console.error("[API] Client not found:", { userId, error: fetchError });
-      return NextResponse.json(
-        { error: "Client not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
     const body = await request.json();
-    
+
     // Zod 스키마로 입력 검증
     const validationResult = updateClientProfileSchema.safeParse(body);
     if (!validationResult.success) {
@@ -124,11 +138,11 @@ export async function PATCH(request: Request) {
         errors: validationResult.error.errors,
       });
       return NextResponse.json(
-        { 
+        {
           error: "Invalid request body",
-          details: validationResult.error.errors 
+          details: validationResult.error.errors,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -137,6 +151,10 @@ export async function PATCH(request: Request) {
       email,
       phone_kr,
       phone_us,
+      occupation,
+      moving_date,
+      relocation_type,
+      moving_type,
       birth_date,
       family_members,
       emergency_contacts,
@@ -148,6 +166,10 @@ export async function PATCH(request: Request) {
       email,
       phone_kr,
       phone_us,
+      occupation,
+      moving_date,
+      relocation_type,
+      moving_type,
       birth_date,
     });
 
@@ -157,6 +179,10 @@ export async function PATCH(request: Request) {
       email,
       phone_kr: phone_kr || null,
       phone_us: phone_us || null,
+      occupation,
+      moving_date,
+      relocation_type,
+      moving_type: moving_type || null,
     };
 
     // birth_date 처리
@@ -192,6 +218,10 @@ export async function PATCH(request: Request) {
           email,
           phone_kr: phone_kr || null,
           phone_us: phone_us || null,
+          occupation,
+          moving_date,
+          relocation_type,
+          moving_type: moving_type || null,
           birth_date: birth_date || null,
         },
       });
@@ -201,7 +231,7 @@ export async function PATCH(request: Request) {
           details: clientError.message || "Unknown error",
           code: clientError.code,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -214,7 +244,10 @@ export async function PATCH(request: Request) {
         .eq("client_id", existingClient.id);
 
       if (deleteFamilyError) {
-        console.error("[API] Failed to delete family members:", deleteFamilyError);
+        console.error(
+          "[API] Failed to delete family members:",
+          deleteFamilyError,
+        );
       } else {
         // 새 가족 정보 추가
         if (family_members.length > 0) {
@@ -222,9 +255,10 @@ export async function PATCH(request: Request) {
             let birthDate = null;
             if (member.birthDate) {
               try {
-                const date = member.birthDate instanceof Date 
-                  ? member.birthDate 
-                  : new Date(member.birthDate);
+                const date =
+                  member.birthDate instanceof Date
+                    ? member.birthDate
+                    : new Date(member.birthDate);
                 if (!isNaN(date.getTime())) {
                   birthDate = date.toISOString().split("T")[0];
                 }
@@ -248,7 +282,10 @@ export async function PATCH(request: Request) {
             .insert(familyData);
 
           if (insertFamilyError) {
-            console.error("[API] Failed to insert family members:", insertFamilyError);
+            console.error(
+              "[API] Failed to insert family members:",
+              insertFamilyError,
+            );
           } else {
             console.log("[API] Family members updated:", {
               clientId: existingClient.id,
@@ -268,7 +305,10 @@ export async function PATCH(request: Request) {
         .eq("client_id", existingClient.id);
 
       if (deleteEmergencyError) {
-        console.error("[API] Failed to delete emergency contacts:", deleteEmergencyError);
+        console.error(
+          "[API] Failed to delete emergency contacts:",
+          deleteEmergencyError,
+        );
       } else {
         // 새 비상연락망 추가
         if (emergency_contacts.length > 0) {
@@ -286,7 +326,10 @@ export async function PATCH(request: Request) {
             .insert(emergencyData);
 
           if (insertEmergencyError) {
-            console.error("[API] Failed to insert emergency contacts:", insertEmergencyError);
+            console.error(
+              "[API] Failed to insert emergency contacts:",
+              insertEmergencyError,
+            );
           } else {
             console.log("[API] Emergency contacts updated:", {
               clientId: existingClient.id,
@@ -309,8 +352,7 @@ export async function PATCH(request: Request) {
     });
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-

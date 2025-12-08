@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthUserId, getAuthRole } from "@/lib/auth";
+import { getAuthUserId, getAuthRole, getClientIdForUser } from "@/lib/auth";
 import { createClerkSupabaseClient } from "@/lib/supabase/server";
 import { fetchListingFromText } from "@/actions/gemini-listing";
 import { extractListingUrls } from "@/lib/listing/url-parser";
@@ -31,10 +31,6 @@ export async function POST(request: Request) {
     const role = await getAuthRole();
     const supabase = createClerkSupabaseClient();
 
-    if (!role) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const body = await request.json();
 
     // Zod 스키마로 입력 검증
@@ -55,27 +51,8 @@ export async function POST(request: Request) {
     // 클라이언트 ID 결정
     let targetClientId: string;
 
-    if (role === "client") {
-      // 클라이언트는 자신의 ID 사용
-      const { data: client, error: clientError } = await supabase
-        .from("clients")
-        .select("id")
-        .eq("clerk_user_id", userId)
-        .single();
-
-      if (clientError || !client) {
-        console.error("[API] Client not found:", {
-          userId,
-          error: clientError,
-        });
-        return NextResponse.json(
-          { error: "Client not found" },
-          { status: 404 },
-        );
-      }
-
-      targetClientId = client.id;
-    } else if (role === "agent") {
+    if (role === "agent") {
+      // 에이전트인 경우
       // 에이전트는 client_id 파라미터 필요
       if (!client_id) {
         return NextResponse.json(
@@ -119,7 +96,21 @@ export async function POST(request: Request) {
 
       targetClientId = client.id;
     } else {
-      return NextResponse.json({ error: "Invalid role" }, { status: 403 });
+      // 클라이언트 본인 또는 권한 부여된 사용자 (role이 없어도 권한 부여된 사용자일 수 있음)
+      const clientId = await getClientIdForUser();
+
+      if (!clientId) {
+        console.log("[API] 클라이언트 또는 권한 부여된 사용자가 아님:", {
+          userId,
+          role,
+        });
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401 },
+        );
+      }
+
+      targetClientId = clientId;
     }
 
     // 채팅방 찾기 또는 생성
@@ -387,10 +378,6 @@ export async function GET(request: Request) {
     const role = await getAuthRole();
     const supabase = createClerkSupabaseClient();
 
-    if (!role) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
 
     // Zod 스키마로 쿼리 파라미터 검증
@@ -424,22 +411,8 @@ export async function GET(request: Request) {
     // 클라이언트 ID 결정
     let targetClientId: string;
 
-    if (role === "client") {
-      const { data: client, error: clientError } = await supabase
-        .from("clients")
-        .select("id")
-        .eq("clerk_user_id", userId)
-        .single();
-
-      if (clientError || !client) {
-        return NextResponse.json(
-          { error: "Client not found" },
-          { status: 404 },
-        );
-      }
-
-      targetClientId = client.id;
-    } else if (role === "agent") {
+    if (role === "agent") {
+      // 에이전트인 경우
       if (!clientIdParam) {
         return NextResponse.json(
           { error: "client_id is required for agents" },
@@ -476,7 +449,21 @@ export async function GET(request: Request) {
 
       targetClientId = client.id;
     } else {
-      return NextResponse.json({ error: "Invalid role" }, { status: 403 });
+      // 클라이언트 본인 또는 권한 부여된 사용자 (role이 없어도 권한 부여된 사용자일 수 있음)
+      const clientId = await getClientIdForUser();
+
+      if (!clientId) {
+        console.log("[API] 클라이언트 또는 권한 부여된 사용자가 아님:", {
+          userId,
+          role,
+        });
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401 },
+        );
+      }
+
+      targetClientId = clientId;
     }
 
     // 채팅방 찾기

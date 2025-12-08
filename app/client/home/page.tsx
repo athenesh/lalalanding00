@@ -49,22 +49,56 @@ export default function ClientHomePage() {
     const role = (user?.publicMetadata as { role?: string })?.role;
     console.log("[ClientHomePage] Current role:", role);
 
-    if (role !== "client") {
-      console.log(
-        `[ClientHomePage] Access denied: role is '${role}', expected 'client'. Redirecting to home.`,
-      );
-      router.push("/");
-      return;
+    // 클라이언트이거나 권한 부여된 사용자인지 확인
+    if (role === "client") {
+      // 클라이언트인 경우 바로 데이터 로드
+      loadProfileData();
+      loadHousingData();
+      loadChecklistData();
+    } else {
+      // role이 없거나 다른 경우 권한 부여 상태 확인
+      checkAuthorizationAndLoad();
     }
-
-    // 프로필 데이터 로드
-    loadProfileData();
-    // 주거옵션 데이터 로드
-    loadHousingData();
-    // 체크리스트 데이터 로드
-    loadChecklistData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, user, authLoaded, userLoaded, router]);
+
+  // 권한 부여 상태 확인 및 데이터 로드
+  const checkAuthorizationAndLoad = async () => {
+    try {
+      console.log("[ClientHomePage] 권한 부여 상태 확인 시작");
+      const response = await fetch("/api/client/authorize/status");
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.hasAuthorization) {
+          console.log(
+            "[ClientHomePage] 권한 부여된 사용자 확인, 데이터 로드 시작",
+          );
+          // 권한 부여된 사용자인 경우 데이터 로드
+          loadProfileData();
+          loadHousingData();
+          loadChecklistData();
+        } else {
+          console.log(
+            "[ClientHomePage] 권한 부여 상태 없음, 홈으로 리다이렉트",
+          );
+          router.push("/");
+        }
+      } else if (response.status === 404) {
+        // 권한이 없음
+        console.log(
+          "[ClientHomePage] 권한 부여 상태 없음 (404), 홈으로 리다이렉트",
+        );
+        router.push("/");
+      } else {
+        console.error("[ClientHomePage] 권한 상태 확인 실패:", response.status);
+        router.push("/");
+      }
+    } catch (error) {
+      console.error("[ClientHomePage] 권한 상태 확인 중 오류:", error);
+      router.push("/");
+    }
+  };
 
   const loadProfileData = async () => {
     try {
@@ -302,16 +336,18 @@ export default function ClientHomePage() {
 
       // ChecklistItem을 DB 업데이트 형식으로 변환
       // 템플릿 기준 로직: templateId를 기준으로 상태만 저장
+      // updateChecklistSchema에 맞는 필드명 사용 (snake_case)
       const itemsToUpdate = items.map((item: any) => ({
-        id: item.id || undefined, // checklist_items의 id (있으면 업데이트, 없으면 생성)
-        templateId: item.templateId, // 템플릿 ID (필수)
-        isCompleted: item.isCompleted || false,
-        memo: item.memo || "",
-        completedAt: item.completedAt
+        templateId: item.templateId, // 템플릿 ID (필수, UUID)
+        is_completed: item.isCompleted || false, // boolean (필수)
+        notes: item.memo || null, // string (optional, nullable)
+        completed_at: item.completedAt
           ? item.completedAt instanceof Date
             ? item.completedAt.toISOString()
             : item.completedAt
-          : null,
+          : null, // string datetime (optional, nullable)
+        // id는 API에서 내부적으로 사용하므로 여기서는 제외
+        // actual_cost와 reference_url은 현재 사용하지 않으므로 제외
       }));
 
       console.log("[ClientHomePage] 체크리스트 업데이트 항목:", {
@@ -506,27 +542,41 @@ export default function ClientHomePage() {
       setIsSaving(true);
       console.log("[ClientHomePage] 프로필 저장 시작:", data);
 
+      // updateClientProfileSchema에 맞는 필드만 포함
       const requestBody: any = {
         name: data.name,
         email: data.email,
-        phone: data.phone,
+        phone_kr: data.phone || null,
+        phone_us: null, // 프로필 탭에서는 phone_kr만 사용
         occupation: data.occupation,
         moving_date: data.movingDate?.toISOString().split("T")[0],
         relocation_type: data.relocationType,
-        moving_type: data.movingType,
+        moving_type: data.movingType || null,
         birth_date: data.birthDate?.toISOString().split("T")[0] || null,
       };
 
       // 가족 정보가 있으면 추가
       if (data.familyMembers && data.familyMembers.length > 0) {
-        requestBody.family_members = data.familyMembers.map((member: any) => ({
-          name: member.name,
-          relationship: member.relationship,
-          birthDate: member.birthDate,
-          phone: member.phone,
-          email: member.email,
-          notes: member.notes,
-        }));
+        requestBody.family_members = data.familyMembers.map((member: any) => {
+          // birthDate를 문자열로 변환 (Date 객체인 경우)
+          let birthDateStr: string | null = null;
+          if (member.birthDate) {
+            if (member.birthDate instanceof Date) {
+              birthDateStr = member.birthDate.toISOString().split("T")[0];
+            } else if (typeof member.birthDate === "string") {
+              birthDateStr = member.birthDate;
+            }
+          }
+
+          return {
+            name: member.name,
+            relationship: member.relationship,
+            birth_date: birthDateStr,
+            phone: member.phone || null,
+            email: member.email || null,
+            notes: member.notes || null,
+          };
+        });
       }
 
       // 비상연락망이 있으면 추가
@@ -535,9 +585,9 @@ export default function ClientHomePage() {
           (contact: any) => ({
             name: contact.name,
             relationship: contact.relationship,
-            phoneKr: contact.phoneKr,
-            email: contact.email,
-            kakaoId: contact.kakaoId,
+            phone_kr: contact.phoneKr || null,
+            email: contact.email || null,
+            kakao_id: contact.kakaoId || null,
           }),
         );
       }
@@ -556,9 +606,24 @@ export default function ClientHomePage() {
           details: errorData.details,
           code: errorData.code,
         });
-        throw new Error(
-          errorData.details || errorData.error || "Failed to update profile",
-        );
+
+        // 에러 메시지 파싱 개선
+        let errorMessage = "Failed to update profile";
+        if (errorData.details) {
+          if (Array.isArray(errorData.details)) {
+            errorMessage = errorData.details
+              .map((err: any) => err.message || JSON.stringify(err))
+              .join(", ");
+          } else if (typeof errorData.details === "string") {
+            errorMessage = errorData.details;
+          } else {
+            errorMessage = JSON.stringify(errorData.details);
+          }
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+
+        throw new Error(errorMessage);
       }
 
       const { client } = await response.json();

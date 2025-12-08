@@ -29,6 +29,14 @@ const notoSansKR = Noto_Sans_KR({
 export const metadata: Metadata = {
   title: "SaaS 템플릿",
   description: "Next.js + Clerk + Supabase 보일러플레이트",
+  icons: {
+    icon: [
+      { url: "/logo.png", type: "image/png" },
+      { url: "/icon.png", type: "image/png" },
+    ],
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

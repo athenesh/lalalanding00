@@ -35,15 +35,28 @@ export const getMessagesQuerySchema = z.object({
 
 // 클라이언트 업데이트 스키마
 export const updateClientSchema = z.object({
-  name: z.string().min(1, "Name is required").max(200, "Name is too long").trim(),
+  name: z
+    .string()
+    .min(1, "Name is required")
+    .max(200, "Name is too long")
+    .trim(),
   email: z.string().email("Invalid email format").max(255, "Email is too long"),
   phone: z.string().max(50, "Phone is too long").optional().nullable(),
-  occupation: z.string().min(1, "Occupation is required").max(100, "Occupation is too long"),
-  moving_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
+  occupation: z
+    .string()
+    .min(1, "Occupation is required")
+    .max(100, "Occupation is too long"),
+  moving_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
   relocation_type: z.enum(["주재원", "학업", "출장"], {
     errorMap: () => ({ message: "Invalid relocation type" }),
   }),
-  moving_type: z.string().max(50, "Moving type is too long").optional().nullable(),
+  moving_type: z
+    .string()
+    .max(50, "Moving type is too long")
+    .optional()
+    .nullable(),
   birth_date: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)")
@@ -62,7 +75,7 @@ export const updateClientSchema = z.object({
         phone: z.string().max(50).optional().nullable(),
         email: z.string().email().max(255).optional().nullable(),
         notes: z.string().max(1000).optional().nullable(),
-      })
+      }),
     )
     .optional()
     .nullable(),
@@ -74,7 +87,7 @@ export const updateClientSchema = z.object({
         phone_kr: z.string().max(50).optional().nullable(),
         email: z.string().email().max(255).optional().nullable(),
         kakao_id: z.string().max(100).optional().nullable(),
-      })
+      }),
     )
     .optional()
     .nullable(),
@@ -82,7 +95,11 @@ export const updateClientSchema = z.object({
 
 // 주거 요구사항 업데이트 스키마
 export const updateHousingSchema = z.object({
-  preferredArea: z.string().max(200, "Preferred area is too long").optional().nullable(),
+  preferredArea: z
+    .string()
+    .max(200, "Preferred area is too long")
+    .optional()
+    .nullable(),
   maxBudget: z
     .string()
     .optional()
@@ -90,10 +107,7 @@ export const updateHousingSchema = z.object({
     .transform((val) => (val ? parseInt(val, 10) : null))
     .pipe(z.number().int().min(0).max(1000000).nullable()),
   housingType: z
-    .union([
-      z.string(),
-      z.array(z.string()),
-    ])
+    .union([z.string(), z.array(z.string())])
     .optional()
     .nullable()
     .transform((val) => {
@@ -129,10 +143,22 @@ export const updateHousingSchema = z.object({
     })
     .pipe(z.number().int().min(0).max(20).nullable()),
   hasPets: z.boolean().optional().nullable(),
-  petDetails: z.string().max(500, "Pet details is too long").optional().nullable(),
+  petDetails: z
+    .string()
+    .max(500, "Pet details is too long")
+    .optional()
+    .nullable(),
   schoolDistrict: z.boolean().optional().nullable(),
-  workplaceAddress: z.string().max(500, "Workplace address is too long").optional().nullable(),
-  additionalNotes: z.string().max(2000, "Additional notes is too long").optional().nullable(),
+  workplaceAddress: z
+    .string()
+    .max(500, "Workplace address is too long")
+    .optional()
+    .nullable(),
+  additionalNotes: z
+    .string()
+    .max(2000, "Additional notes is too long")
+    .optional()
+    .nullable(),
 });
 
 // 체크리스트 업데이트 스키마
@@ -142,25 +168,43 @@ export const updateChecklistSchema = z.object({
       templateId: uuidSchema,
       is_completed: z.boolean(),
       notes: z.string().max(2000, "Notes is too long").optional().nullable(),
-      actual_cost: z
-        .number()
-        .int()
-        .min(0)
-        .max(10000000)
+      actual_cost: z.number().int().min(0).max(10000000).optional().nullable(),
+      reference_url: z
+        .string()
+        .url("Invalid URL format")
+        .max(500)
         .optional()
         .nullable(),
-      reference_url: z.string().url("Invalid URL format").max(500).optional().nullable(),
       completed_at: z.string().datetime().optional().nullable(),
-    })
+    }),
   ),
 });
 
 // 클라이언트 프로필 업데이트 스키마 (클라이언트용)
 export const updateClientProfileSchema = z.object({
-  name: z.string().min(1, "Name is required").max(200, "Name is too long").trim(),
+  name: z
+    .string()
+    .min(1, "Name is required")
+    .max(200, "Name is too long")
+    .trim(),
   email: z.string().email("Invalid email format").max(255, "Email is too long"),
   phone_kr: z.string().max(50, "Phone is too long").optional().nullable(),
   phone_us: z.string().max(50, "Phone is too long").optional().nullable(),
+  occupation: z
+    .string()
+    .min(1, "Occupation is required")
+    .max(100, "Occupation is too long"),
+  moving_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
+  relocation_type: z.enum(["주재원", "학업", "출장"], {
+    errorMap: () => ({ message: "Invalid relocation type" }),
+  }),
+  moving_type: z
+    .string()
+    .max(50, "Moving type is too long")
+    .optional()
+    .nullable(),
   birth_date: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)")
@@ -179,7 +223,7 @@ export const updateClientProfileSchema = z.object({
         phone: z.string().max(50).optional().nullable(),
         email: z.string().email().max(255).optional().nullable(),
         notes: z.string().max(1000).optional().nullable(),
-      })
+      }),
     )
     .optional()
     .nullable(),
@@ -191,9 +235,8 @@ export const updateClientProfileSchema = z.object({
         phone_kr: z.string().max(50).optional().nullable(),
         email: z.string().email().max(255).optional().nullable(),
         kakao_id: z.string().max(100).optional().nullable(),
-      })
+      }),
     )
     .optional()
     .nullable(),
 });
-

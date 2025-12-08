@@ -1,45 +1,29 @@
 import { NextResponse } from "next/server";
-import { getAuthUserId, requireClient } from "@/lib/auth";
+import { getClientIdForUser, requireClientOrAuthorized } from "@/lib/auth";
 import { createClerkSupabaseClient } from "@/lib/supabase/server";
 import { updateHousingSchema } from "@/lib/validations/api-schemas";
 
 /**
  * GET /api/client/housing
  * 클라이언트 자신의 주거 요구사항을 조회합니다.
+ * 권한 부여된 사용자도 접근 가능합니다.
  */
 export async function GET() {
   try {
     console.log("[API] GET /api/client/housing 호출");
 
-    // 클라이언트 권한 확인
-    await requireClient();
+    // 클라이언트 또는 권한 부여된 사용자 확인
+    await requireClientOrAuthorized();
 
-    const userId = await getAuthUserId();
     const supabase = createClerkSupabaseClient();
 
-    // 클라이언트 정보 조회 (clerk_user_id로)
-    const { data: client, error: clientError } = await supabase
-      .from("clients")
-      .select("id")
-      .eq("clerk_user_id", userId)
-      .single();
+    // 클라이언트 본인 또는 권한 부여된 사용자의 client_id 조회
+    const clientId = await getClientIdForUser();
 
-    if (clientError) {
-      console.error("[API] Client fetch error:", {
-        userId,
-        error: clientError,
-      });
-      if (clientError.code === "PGRST116") {
-        // 클라이언트를 찾을 수 없음
-        console.warn("[API] Client not found:", { userId });
-        return NextResponse.json(
-          { error: "Client not found" },
-          { status: 404 },
-        );
-      }
+    if (!clientId) {
       return NextResponse.json(
-        { error: "Failed to fetch client" },
-        { status: 500 },
+        { error: "Client not found" },
+        { status: 404 },
       );
     }
 
@@ -47,21 +31,21 @@ export async function GET() {
     const { data: housing, error: housingError } = await supabase
       .from("housing_requirements")
       .select("*")
-      .eq("client_id", client.id)
+      .eq("client_id", clientId)
       .single();
 
     if (housingError) {
       if (housingError.code === "PGRST116") {
         // 주거 요구사항이 없음 (새로 생성해야 함)
         console.log("[API] Housing requirements not found, returning empty:", {
-          clientId: client.id,
+          clientId,
         });
         return NextResponse.json({
           housing: null,
         });
       }
       console.error("[API] Housing fetch error:", {
-        clientId: client.id,
+        clientId,
         error: housingError,
       });
       return NextResponse.json(
@@ -71,7 +55,7 @@ export async function GET() {
     }
 
     console.log("[API] Housing requirements 조회 성공:", {
-      clientId: client.id,
+      clientId,
       housingId: housing?.id,
       housingType: housing?.housing_type,
     });
@@ -100,26 +84,21 @@ export async function GET() {
 /**
  * PATCH /api/client/housing
  * 클라이언트 자신의 주거 요구사항을 업데이트합니다. (없으면 생성)
+ * 권한 부여된 사용자도 수정 가능합니다.
  */
 export async function PATCH(request: Request) {
   try {
     console.log("[API] PATCH /api/client/housing 호출");
 
-    // 클라이언트 권한 확인
-    await requireClient();
+    // 클라이언트 또는 권한 부여된 사용자 확인
+    await requireClientOrAuthorized();
 
-    const userId = await getAuthUserId();
     const supabase = createClerkSupabaseClient();
 
-    // 클라이언트 정보 조회 (clerk_user_id로)
-    const { data: client, error: clientError } = await supabase
-      .from("clients")
-      .select("id")
-      .eq("clerk_user_id", userId)
-      .single();
+    // 클라이언트 본인 또는 권한 부여된 사용자의 client_id 조회
+    const clientId = await getClientIdForUser();
 
-    if (clientError || !client) {
-      console.error("[API] Client not found:", { userId, error: clientError });
+    if (!clientId) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
@@ -129,7 +108,7 @@ export async function PATCH(request: Request) {
     const validationResult = updateHousingSchema.safeParse(body);
     if (!validationResult.success) {
       console.warn("[API] Invalid request body:", {
-        clientId: client.id,
+        clientId,
         errors: validationResult.error.errors,
       });
       return NextResponse.json(
@@ -159,7 +138,7 @@ export async function PATCH(request: Request) {
     } = validationResult.data;
 
     console.log("[API] 주거 요구사항 업데이트 데이터:", {
-      clientId: client.id,
+      clientId,
       preferredArea,
       maxBudget,
       housingType,
@@ -210,7 +189,7 @@ export async function PATCH(request: Request) {
     const { data: existingHousing } = await supabase
       .from("housing_requirements")
       .select("id")
-      .eq("client_id", client.id)
+      .eq("client_id", clientId)
       .single();
 
     let housing;
@@ -226,7 +205,7 @@ export async function PATCH(request: Request) {
 
       if (updateError) {
         console.error("[API] Housing update error:", {
-          clientId: client.id,
+          clientId,
           error: updateError,
         });
         return NextResponse.json(
@@ -241,7 +220,7 @@ export async function PATCH(request: Request) {
       const { data: newHousing, error: insertError } = await supabase
         .from("housing_requirements")
         .insert({
-          client_id: client.id,
+          client_id: clientId,
           ...updateData,
         })
         .select()
@@ -249,7 +228,7 @@ export async function PATCH(request: Request) {
 
       if (insertError) {
         console.error("[API] Housing insert error:", {
-          clientId: client.id,
+          clientId,
           error: insertError,
         });
         return NextResponse.json(
@@ -262,7 +241,7 @@ export async function PATCH(request: Request) {
     }
 
     console.log("[API] Housing requirements 업데이트 성공:", {
-      clientId: client.id,
+      clientId,
       housingId: housing.id,
     });
 

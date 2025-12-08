@@ -88,6 +88,100 @@ export async function requireClient() {
 }
 
 /**
+ * 권한 부여된 사용자의 client_id를 조회합니다.
+ * 권한이 없으면 null을 반환합니다.
+ *
+ * @returns 권한 부여된 클라이언트의 client_id 또는 null
+ */
+export async function getAuthorizedClientId(): Promise<string | null> {
+  const userId = await getAuthUserId();
+  const supabase = createClerkSupabaseClient();
+
+  try {
+    const { data: authorization, error } = await supabase
+      .from("client_authorizations")
+      .select("client_id")
+      .eq("authorized_clerk_user_id", userId)
+      .single();
+
+    if (error || !authorization) {
+      // 권한이 없거나 에러 발생
+      return null;
+    }
+
+    console.log("[Auth] 권한 부여된 사용자 확인:", {
+      userId,
+      clientId: authorization.client_id,
+    });
+
+    return authorization.client_id;
+  } catch (error) {
+    console.error("[Auth] 권한 확인 중 오류:", error);
+    return null;
+  }
+}
+
+/**
+ * 클라이언트 본인 또는 권한 부여된 사용자의 client_id를 반환합니다.
+ * 권한 부여된 클라이언트가 있으면 우선적으로 반환합니다.
+ * 둘 다 없으면 null을 반환합니다.
+ *
+ * 우선순위:
+ * 1. 권한 부여된 클라이언트 (배우자가 권한을 받은 클라이언트)
+ * 2. 본인 클라이언트
+ *
+ * @returns client_id 또는 null
+ */
+export async function getClientIdForUser(): Promise<string | null> {
+  const userId = await getAuthUserId();
+  const supabase = createClerkSupabaseClient();
+
+  // 1. 권한 부여된 사용자인지 먼저 확인 (우선순위)
+  // 배우자는 항상 권한을 받은 클라이언트의 데이터를 봐야 함
+  const authorizedClientId = await getAuthorizedClientId();
+  if (authorizedClientId) {
+    console.log("[Auth] 권한 부여된 클라이언트 우선 반환:", {
+      userId,
+      clientId: authorizedClientId,
+    });
+    return authorizedClientId;
+  }
+
+  // 2. 본인이 클라이언트인지 확인
+  const { data: ownClient, error: ownClientError } = await supabase
+    .from("clients")
+    .select("id")
+    .eq("clerk_user_id", userId)
+    .single();
+
+  if (ownClient && !ownClientError) {
+    console.log("[Auth] 본인 클라이언트 확인:", {
+      userId,
+      clientId: ownClient.id,
+    });
+    return ownClient.id;
+  }
+
+  // 둘 다 없으면 null 반환
+  return null;
+}
+
+/**
+ * 클라이언트 또는 권한 부여된 사용자인지 확인합니다.
+ * 둘 다 아닌 경우 홈으로 리다이렉트합니다.
+ *
+ * 주의: API 라우트에서는 이 함수를 사용하지 말고, 직접 NextResponse를 반환하세요.
+ */
+export async function requireClientOrAuthorized() {
+  const clientId = await getClientIdForUser();
+
+  if (!clientId) {
+    console.log("[Auth] 클라이언트 또는 권한 부여된 사용자가 아님");
+    redirect("/");
+  }
+}
+
+/**
  * Account를 조회하고, 없으면 자동으로 생성합니다.
  * 에이전트용 accounts 테이블에 레코드를 생성합니다.
  */

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthUserId, requireClient } from "@/lib/auth";
+import { getClientIdForUser, requireClientOrAuthorized } from "@/lib/auth";
 import { createClerkSupabaseClient } from "@/lib/supabase/server";
 import type { Tables, TablesInsert } from "@/database.types";
 import {
@@ -17,6 +17,7 @@ import { updateChecklistSchema } from "@/lib/validations/api-schemas";
 /**
  * GET /api/client/checklist
  * 클라이언트 자신의 체크리스트를 조회합니다.
+ * 권한 부여된 사용자도 접근 가능합니다.
  * 
  * 로직:
  * 1. 템플릿을 기준으로 화면 구성 (템플릿이 메인)
@@ -27,21 +28,15 @@ export async function GET() {
   try {
     console.log("[API] GET /api/client/checklist 호출");
 
-    // 클라이언트 권한 확인
-    await requireClient();
+    // 클라이언트 또는 권한 부여된 사용자 확인
+    await requireClientOrAuthorized();
 
-    const userId = await getAuthUserId();
     const supabase = createClerkSupabaseClient();
 
-    // 클라이언트 정보 조회 (clerk_user_id로)
-    const { data: client, error: clientError } = await supabase
-      .from("clients")
-      .select("id")
-      .eq("clerk_user_id", userId)
-      .single();
+    // 클라이언트 본인 또는 권한 부여된 사용자의 client_id 조회
+    const clientId = await getClientIdForUser();
 
-    if (clientError || !client) {
-      console.error("[API] Client not found:", { userId, error: clientError });
+    if (!clientId) {
       return NextResponse.json(
         { error: "Client not found" },
         { status: 404 }
@@ -56,7 +51,7 @@ export async function GET() {
 
     if (templateError) {
       console.error("[API] Template fetch error:", {
-        clientId: client.id,
+        clientId,
         error: templateError,
       });
       return NextResponse.json(
@@ -66,7 +61,7 @@ export async function GET() {
     }
 
     if (!templates || templates.length === 0) {
-      console.log("[API] 템플릿이 없음:", { clientId: client.id });
+      console.log("[API] 템플릿이 없음:", { clientId });
       return NextResponse.json({
         checklist: [],
         groupedByCategory: {},
@@ -79,11 +74,11 @@ export async function GET() {
       .select(
         "id,template_id,is_completed,notes,completed_at"
       )
-      .eq("client_id", client.id);
+      .eq("client_id", clientId);
 
     if (checklistError) {
       console.error("[API] Checklist fetch error:", {
-        clientId: client.id,
+        clientId,
         error: checklistError,
       });
       // 에러가 있어도 템플릿은 반환
@@ -143,7 +138,7 @@ export async function GET() {
     });
 
     console.log("[API] Checklist 조회 성공:", {
-      clientId: client.id,
+      clientId,
       templateCount: templates.length,
       itemCount: mergedItems.length,
       itemsWithStatus: checklistItems?.length || 0,
@@ -167,6 +162,7 @@ export async function GET() {
 /**
  * PATCH /api/client/checklist
  * 클라이언트 자신의 체크리스트 항목들을 업데이트합니다.
+ * 권한 부여된 사용자도 수정 가능합니다.
  * 
  * 로직:
  * - templateId를 기준으로 checklist_items 업데이트/생성
@@ -177,21 +173,15 @@ export async function PATCH(request: Request) {
   try {
     console.log("[API] PATCH /api/client/checklist 호출");
 
-    // 클라이언트 권한 확인
-    await requireClient();
+    // 클라이언트 또는 권한 부여된 사용자 확인
+    await requireClientOrAuthorized();
 
-    const userId = await getAuthUserId();
     const supabase = createClerkSupabaseClient();
 
-    // 클라이언트 정보 조회 (clerk_user_id로)
-    const { data: client, error: clientError } = await supabase
-      .from("clients")
-      .select("id")
-      .eq("clerk_user_id", userId)
-      .single();
+    // 클라이언트 본인 또는 권한 부여된 사용자의 client_id 조회
+    const clientId = await getClientIdForUser();
 
-    if (clientError || !client) {
-      console.error("[API] Client not found:", { userId, error: clientError });
+    if (!clientId) {
       return NextResponse.json(
         { error: "Client not found" },
         { status: 404 }
@@ -204,7 +194,7 @@ export async function PATCH(request: Request) {
     const validationResult = updateChecklistSchema.safeParse(body);
     if (!validationResult.success) {
       console.warn("[API] Invalid request body:", {
-        clientId: client.id,
+        clientId,
         errors: validationResult.error.errors,
       });
       return NextResponse.json(
@@ -219,18 +209,17 @@ export async function PATCH(request: Request) {
     const { items } = validationResult.data;
 
     console.log("[API] 체크리스트 업데이트 데이터:", {
-      clientId: client.id,
+      clientId,
       itemCount: items.length,
     });
 
     // templateId를 기준으로 업데이트/생성
     const updatePromises = items.map(async (item: any) => {
       const {
-        id, // checklist_items의 id (있으면 업데이트, 없으면 생성)
         templateId, // 템플릿 ID (필수)
-        isCompleted,
-        memo, // notes
-        completedAt,
+        is_completed, // boolean (validation 스키마에서)
+        notes, // string (validation 스키마에서)
+        completed_at, // string datetime (validation 스키마에서)
       } = item;
 
       if (!templateId) {
@@ -250,35 +239,43 @@ export async function PATCH(request: Request) {
         return null;
       }
 
+      // 기존 항목 조회 (templateId로)
+      const { data: existingItem } = await supabase
+        .from("checklist_items")
+        .select("id")
+        .eq("client_id", clientId)
+        .eq("template_id", templateId)
+        .single();
+
       // 완료 시간 설정
       let completedAtValue: string | null = null;
-      if (isCompleted !== undefined) {
-        if (isCompleted) {
-          completedAtValue = completedAt
-            ? new Date(completedAt).toISOString()
+      if (is_completed !== undefined) {
+        if (is_completed) {
+          completedAtValue = completed_at
+            ? new Date(completed_at).toISOString()
             : new Date().toISOString();
         } else {
           completedAtValue = null;
         }
       }
 
-      // id가 있는 경우 업데이트
-      if (id) {
+      // 기존 항목이 있는 경우 업데이트
+      if (existingItem?.id) {
         const { data: updatedItem, error: updateError } = await supabase
           .from("checklist_items")
           .update({
-            is_completed: isCompleted !== undefined ? isCompleted : undefined,
-            notes: memo !== undefined ? memo || null : undefined,
+            is_completed: is_completed !== undefined ? is_completed : undefined,
+            notes: notes !== undefined ? notes || null : undefined,
             completed_at: completedAtValue,
           })
-          .eq("id", id)
-          .eq("client_id", client.id) // 소유권 확인
+          .eq("id", existingItem.id)
+          .eq("client_id", clientId) // 소유권 확인
           .select("id,template_id,is_completed,notes,completed_at")
           .single();
 
         if (updateError) {
           console.error("[API] Checklist item update error:", {
-            itemId: id,
+            itemId: existingItem.id,
             error: updateError,
           });
           return null;
@@ -287,16 +284,16 @@ export async function PATCH(request: Request) {
         return updatedItem;
       }
 
-      // id가 없는 경우 생성 (상태 정보만 저장)
+      // 기존 항목이 없는 경우 생성 (상태 정보만 저장)
       // 템플릿 속성(category, title, description, order_num, is_required)은 제거됨
       // template_id로 템플릿을 참조하므로 상태 정보만 저장
       const { data: newItem, error: insertError } = await supabase
         .from("checklist_items")
         .insert({
-          client_id: client.id,
+          client_id: clientId,
           template_id: templateId,
-          is_completed: isCompleted || false,
-          notes: memo || null,
+          is_completed: is_completed || false,
+          notes: notes || null,
           completed_at: completedAtValue,
         })
         .select("id,template_id,is_completed,notes,completed_at")
@@ -322,7 +319,7 @@ export async function PATCH(request: Request) {
     const successfulUpdates = updatedItems.filter((item) => item !== null);
 
     console.log("[API] Checklist 업데이트 성공:", {
-      clientId: client.id,
+      clientId,
       updatedCount: successfulUpdates.length,
       totalCount: items.length,
     });

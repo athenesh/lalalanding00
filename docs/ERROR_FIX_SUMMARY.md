@@ -246,6 +246,70 @@ Clerk를 Supabase Third-Party Auth로 등록:
   - 타이핑 중에는 로컬 상태만 업데이트하고, 입력이 멈춘 후에만 서버에 저장
   - `updateChecklistItem` 함수에 `shouldSave` 파라미터 추가하여 저장 여부 제어
 
+### 8. 권한 부여된 사용자의 파일 업로드 실패 ("new row violates row-level security policy")
+
+**원인**: 권한 부여된 사용자가 클라이언트의 체크리스트에 파일을 업로드할 때 Storage RLS 정책 위반으로 실패했습니다.
+
+**상세 분석**:
+
+1. **파일 업로드 과정**: Storage에 파일 저장 → `client_documents` 테이블에 메타데이터 저장
+2. **실패 지점**: Storage 업로드 성공, `client_documents` INSERT 실패
+3. **근본 원인**: `storage.objects` 테이블의 RLS 정책이 잘못되어 있었음
+
+**정책 오류 상세**:
+
+- **잘못된 코드**: `WHERE clients.clerk_user_id = (storage.foldername(clients.name))[1]`
+- **올바른 코드**: `WHERE clients.clerk_user_id = (storage.foldername(name))[1]`
+
+잘못된 정책에서는 `clients.name` (클라이언트 이름)을 사용하여 폴더명을 추출했지만, 실제로는 업로드할 파일의 경로(`name` 파라미터)에서 폴더명을 추출해야 합니다.
+
+**로그 분석 결과**:
+
+```
+권한 부여된 사용자: user_36YD5AQcuFhT9bWvsQ4yRzFtEFg
+클라이언트 폴더: user_36EfvxKHSAEpOowD9PUM0COM1Vs (클라이언트의 clerk_user_id)
+Storage 경로: user_36EfvxKHSAEpOowD9PUM0COM1Vs/checklist/...
+```
+
+**해결 방법**:
+
+Supabase SQL 에디터에서 다음 SQL을 실행하여 Storage RLS 정책을 수정:
+
+```sql
+-- 잘못된 정책들 삭제
+DROP POLICY IF EXISTS "Users can upload to own folder or authorized client folder" ON storage.objects;
+DROP POLICY IF EXISTS "Users can view own files or authorized client files" ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete own files or authorized client files" ON storage.objects;
+DROP POLICY IF EXISTS "Users can update own files or authorized client files" ON storage.objects;
+
+-- 올바른 정책들 생성 (storage.foldername(name) 사용)
+CREATE POLICY "Users can upload to own folder or authorized client folder"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'uploads' AND (
+    (storage.foldername(name))[1] = ((select auth.jwt())->>'sub')
+    OR
+    EXISTS (
+      SELECT 1 FROM public.clients
+      WHERE clients.clerk_user_id = (storage.foldername(name))[1]
+      AND EXISTS (
+        SELECT 1 FROM public.client_authorizations
+        WHERE client_authorizations.client_id = clients.id
+        AND client_authorizations.authorized_clerk_user_id = ((select auth.jwt())->>'sub')
+      )
+    )
+  )
+);
+
+-- SELECT, DELETE, UPDATE 정책들도 동일하게 수정
+```
+
+**해결 결과**:
+
+- 권한 부여된 사용자가 클라이언트의 파일을 정상적으로 업로드할 수 있게 됨
+- Storage RLS 정책이 올바르게 작동하여 보안과 기능이 모두 유지됨
+
 ## 참고 자료
 
 - [Supabase Clerk 통합 가이드](https://supabase.com/docs/guides/auth/third-party/clerk)

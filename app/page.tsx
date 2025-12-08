@@ -21,10 +21,11 @@ import Link from "next/link";
 
 export default function Home() {
   const router = useRouter();
-  const { isLoaded: authLoaded } = useAuth();
+  const { isLoaded: authLoaded, userId } = useAuth();
   const { user, isLoaded: userLoaded } = useUser();
   const [role, setRole] = useState<string | undefined>(undefined);
   const hasRedirected = useRef(false);
+  const isCheckingAuthorization = useRef(false);
 
   // useUser를 통해 최신 publicMetadata 가져오기
   useEffect(() => {
@@ -40,19 +41,58 @@ export default function Home() {
 
   // 역할이 확인되면 자동으로 대시보드로 리다이렉트 (한 번만 실행)
   useEffect(() => {
-    if (authLoaded && userLoaded && role && !hasRedirected.current) {
+    if (!authLoaded || !userLoaded || hasRedirected.current) return;
+
+    // role이 있는 경우
+    if (role === "agent") {
       hasRedirected.current = true;
-      if (role === "agent") {
-        console.log("[HomePage] Redirecting agent to dashboard (one-time)");
-        // window.location.href를 사용하여 강제 리다이렉트 (세션 새로고침)
-        window.location.href = "/agent/dashboard";
-      } else if (role === "client") {
-        console.log("[HomePage] Redirecting client to home (one-time)");
-        // window.location.href를 사용하여 강제 리다이렉트 (세션 새로고침)
-        window.location.href = "/client/home";
-      }
+      console.log("[HomePage] Redirecting agent to dashboard (one-time)");
+      window.location.href = "/agent/dashboard";
+      return;
     }
-  }, [authLoaded, userLoaded, role]);
+
+    if (role === "client") {
+      hasRedirected.current = true;
+      console.log("[HomePage] Redirecting client to home (one-time)");
+      window.location.href = "/client/home";
+      return;
+    }
+
+    // role이 없지만 로그인한 경우 권한 부여 상태 확인
+    if (!role && userId && !isCheckingAuthorization.current) {
+      isCheckingAuthorization.current = true;
+      
+      // 권한 부여 상태 확인 함수 (useEffect 내부에서 정의)
+      const checkAuthorizationStatus = async () => {
+        try {
+          console.log("[HomePage] 권한 부여 상태 확인 시작");
+          const response = await fetch("/api/client/authorize/status");
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.hasAuthorization) {
+              hasRedirected.current = true;
+              console.log("[HomePage] 권한 부여된 사용자 확인, /client/home으로 리다이렉트");
+              window.location.href = "/client/home";
+            } else {
+              console.log("[HomePage] 권한 부여 상태 없음");
+            }
+          } else if (response.status === 404) {
+            // 권한이 없음 (정상)
+            console.log("[HomePage] 권한 부여 상태 없음 (404)");
+          } else {
+            console.error("[HomePage] 권한 상태 확인 실패:", response.status);
+          }
+        } catch (error) {
+          console.error("[HomePage] 권한 상태 확인 중 오류:", error);
+        } finally {
+          isCheckingAuthorization.current = false;
+        }
+      };
+
+      checkAuthorizationStatus();
+    }
+  }, [authLoaded, userLoaded, role, userId]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background p-4">

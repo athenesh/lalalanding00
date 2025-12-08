@@ -450,7 +450,7 @@ const ChecklistRow = ({
                           <FileText className="w-4 h-4 text-blue-500 shrink-0" />
                         )}
                         <a
-                          href={file.url}
+                          href={`/api/client/checklist/files/download?document_id=${file.document_id}`}
                           target="_blank"
                           rel="noreferrer"
                           className="text-xs text-slate-700 truncate hover:text-indigo-600 hover:underline"
