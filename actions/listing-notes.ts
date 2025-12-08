@@ -108,12 +108,28 @@ export async function updateListingNotes(
       }
     }
 
-    if (!isClient && !isAgent) {
+    // 권한 부여된 사용자인지 확인
+    let isAuthorized = false;
+    const { data: authorization, error: authError } = await supabase
+      .from("client_authorizations")
+      .select("id")
+      .eq("client_id", room.client_id)
+      .eq("authorized_clerk_user_id", userId)
+      .maybeSingle();
+
+    if (!authError && authorization) {
+      isAuthorized = true;
+    }
+
+    if (!isClient && !isAgent && !isAuthorized) {
       console.error("[Server Action] 채팅방 참여자가 아님:", {
         listingId,
         userId,
         clientId: client.clerk_user_id,
         ownerAgentId: client.owner_agent_id,
+        isClient,
+        isAgent,
+        isAuthorized,
       });
       return { success: false, error: "Access denied" };
     }

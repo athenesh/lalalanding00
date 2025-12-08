@@ -357,7 +357,7 @@
 #### 5.6 POST /api/client/checklist/files
 
 - **용도**: 체크리스트 항목에 파일 업로드
-- **권한**: 클라이언트만
+- **권한**: 클라이언트 또는 권한 부여된 사용자 (배우자 등)
 - **상태**: ✅ 구현 완료
 - **파일**: `app/api/client/checklist/files/route.ts`
 - **요청 형식**: `multipart/form-data`
@@ -372,12 +372,18 @@
     "documentId": "uuid"
   }
   ```
-- **설명**: 클라이언트가 자신의 체크리스트 항목에 파일을 업로드
+- **설명**:
+  - 클라이언트가 자신의 체크리스트 항목에 파일을 업로드
+  - 권한 부여된 사용자(배우자 등)도 클라이언트의 체크리스트에 파일 업로드 가능
+  - Storage RLS 정책을 통해 권한 확인 (`client_authorizations` 테이블 기반)
+- **주의사항**:
+  - Storage RLS 정책이 올바르게 설정되어 있어야 함
+  - `FINAL_CORRECT_FIX.sql` 파일을 실행하여 정책을 설정해야 권한 부여된 사용자도 업로드 가능
 
 #### 5.7 DELETE /api/client/checklist/files
 
 - **용도**: 체크리스트 항목의 파일 삭제
-- **권한**: 클라이언트만
+- **권한**: 클라이언트 또는 권한 부여된 사용자 (배우자 등)
 - **상태**: ✅ 구현 완료
 - **파일**: `app/api/client/checklist/files/route.ts`
 - **쿼리 파라미터**:
@@ -389,7 +395,10 @@
     "success": true
   }
   ```
-- **설명**: 클라이언트가 자신의 체크리스트 항목에서 파일을 삭제
+- **설명**:
+  - 클라이언트가 자신의 체크리스트 항목에서 파일을 삭제
+  - 권한 부여된 사용자(배우자 등)도 클라이언트의 체크리스트 파일 삭제 가능
+  - Storage RLS 정책을 통해 권한 확인 (`client_authorizations` 테이블 기반)
 
 ### 체크리스트 API 성능 최적화 (2025-01-28)
 
@@ -602,6 +611,71 @@ const uiData = {
 ---
 
 **문서 작성일**: 2025-01-27  
-**최종 업데이트**: 2025-01-28 (체크리스트 파일 관리 API 추가)  
+**최종 업데이트**: 2025-12-08 (체크리스트 파일 관리 API 추가, Storage RLS 정책 문제 해결)  
 **작성자**: AI Assistant  
 **검토 필요**: ✅
+
+---
+
+## 🔧 Storage RLS 정책 설정 (권한 부여된 사용자 파일 업로드)
+
+### 문제 해결 요약
+
+권한 부여된 사용자(배우자 등)가 클라이언트의 체크리스트에 파일을 업로드할 수 있도록 Storage RLS 정책을 설정했습니다.
+
+### 핵심 문제
+
+PostgreSQL이 `EXISTS` 서브쿼리 내에서 `name`을 참조할 때, 가장 가까운 테이블인 `clients`의 컬럼으로 해석하여 `clients.name`으로 변환하는 문제가 발생했습니다.
+
+### 해결 방법
+
+1. **Supabase 공식 문서 확인**: [Storage Helper Functions](https://supabase.com/docs/guides/storage/schema/helper-functions) 참고
+2. **서브쿼리 구조 변경**: `EXISTS` 서브쿼리 대신 `IN` 절 사용
+3. **정책 생성**: `FINAL_CORRECT_FIX.sql` 파일 실행
+
+### 적용 방법
+
+Supabase SQL Editor에서 `FINAL_CORRECT_FIX.sql` 파일을 전체 실행:
+
+```sql
+-- 모든 기존 정책 삭제 후 올바른 정책 생성
+-- 핵심: IN 절을 사용하여 name이 storage.objects에서 오는 것을 명확히 함
+(storage.foldername(name))[1] IN (
+  SELECT clients.clerk_user_id
+  FROM public.clients
+  WHERE EXISTS (
+    SELECT 1 FROM public.client_authorizations
+    WHERE client_authorizations.client_id = clients.id
+    AND client_authorizations.authorized_clerk_user_id = ((select auth.jwt())->>'sub')
+  )
+)
+```
+
+### 확인 방법
+
+정책 생성 후 다음 쿼리로 확인:
+
+```sql
+SELECT
+  policyname,
+  cmd,
+  CASE
+    WHEN with_check LIKE '%storage.foldername(clients.name)%' THEN '❌ 잘못됨'
+    WHEN qual LIKE '%storage.foldername(clients.name)%' THEN '❌ 잘못됨'
+    WHEN with_check LIKE '%storage.foldername(name)%' THEN '✅ 올바름'
+    WHEN qual LIKE '%storage.foldername(name)%' THEN '✅ 올바름'
+    ELSE '⚠️ 확인 필요'
+  END as status
+FROM pg_policies
+WHERE schemaname = 'storage'
+  AND tablename = 'objects'
+ORDER BY cmd, policyname;
+```
+
+모든 정책이 "✅ 올바름: name 사용"으로 표시되어야 합니다.
+
+### 관련 문서
+
+- [ERROR_FIX_SUMMARY.md](./ERROR_FIX_SUMMARY.md#8-권한-부여된-사용자의-파일-업로드-실패-new-row-violates-row-level-security-policy) - 상세한 문제 해결 과정
+- [Supabase Storage Helper Functions](https://supabase.com/docs/guides/storage/schema/helper-functions)
+- [Supabase Storage Access Control](https://supabase.com/docs/guides/storage/security/access-control)

@@ -248,12 +248,12 @@ Clerk를 Supabase Third-Party Auth로 등록:
 
 ### 8. 권한 부여된 사용자의 파일 업로드 실패 ("new row violates row-level security policy")
 
-**원인**: 권한 부여된 사용자가 클라이언트의 체크리스트에 파일을 업로드할 때 Storage RLS 정책 위반으로 실패했습니다.
+**원인**: 권한 부여된 사용자(배우자 등)가 클라이언트의 체크리스트에 파일을 업로드할 때 Storage RLS 정책 위반으로 실패했습니다.
 
 **상세 분석**:
 
 1. **파일 업로드 과정**: Storage에 파일 저장 → `client_documents` 테이블에 메타데이터 저장
-2. **실패 지점**: Storage 업로드 성공, `client_documents` INSERT 실패
+2. **실패 지점**: Storage 업로드 시 RLS 정책 위반으로 실패
 3. **근본 원인**: `storage.objects` 테이블의 RLS 정책이 잘못되어 있었음
 
 **정책 오류 상세**:
@@ -263,6 +263,17 @@ Clerk를 Supabase Third-Party Auth로 등록:
 
 잘못된 정책에서는 `clients.name` (클라이언트 이름)을 사용하여 폴더명을 추출했지만, 실제로는 업로드할 파일의 경로(`name` 파라미터)에서 폴더명을 추출해야 합니다.
 
+**PostgreSQL 이름 해석 문제**:
+
+PostgreSQL이 `EXISTS` 서브쿼리 내에서 `name`을 참조할 때, 가장 가까운 테이블인 `clients`의 컬럼으로 해석하여 `clients.name`으로 변환하는 문제가 발생했습니다.
+
+**트러블슈팅 과정**:
+
+1. **초기 시도**: `storage.foldername(name)[1]` 사용 → 여전히 `clients.name`으로 해석됨
+2. **명시적 참조 시도**: `storage.objects.name` 명시 → 복잡하고 효과 없음
+3. **LATERAL JOIN 시도**: `CROSS JOIN LATERAL` 사용 → 복잡함
+4. **최종 해결**: 서브쿼리 구조를 `IN` 절로 변경하여 `name`이 `storage.objects`에서 오는 것을 명확히 함
+
 **로그 분석 결과**:
 
 ```
@@ -271,29 +282,32 @@ Clerk를 Supabase Third-Party Auth로 등록:
 Storage 경로: user_36EfvxKHSAEpOowD9PUM0COM1Vs/checklist/...
 ```
 
-**해결 방법**:
+**최종 해결 방법**:
 
-Supabase SQL 에디터에서 다음 SQL을 실행하여 Storage RLS 정책을 수정:
+Supabase SQL 에디터에서 `FINAL_CORRECT_FIX.sql` 파일을 실행하여 Storage RLS 정책을 수정:
 
 ```sql
--- 잘못된 정책들 삭제
+-- 모든 기존 정책 삭제
 DROP POLICY IF EXISTS "Users can upload to own folder or authorized client folder" ON storage.objects;
 DROP POLICY IF EXISTS "Users can view own files or authorized client files" ON storage.objects;
 DROP POLICY IF EXISTS "Users can delete own files or authorized client files" ON storage.objects;
 DROP POLICY IF EXISTS "Users can update own files or authorized client files" ON storage.objects;
 
--- 올바른 정책들 생성 (storage.foldername(name) 사용)
+-- 올바른 정책 생성 (IN 절 사용으로 name이 storage.objects에서 오는 것을 명확히 함)
 CREATE POLICY "Users can upload to own folder or authorized client folder"
 ON storage.objects FOR INSERT
 TO authenticated
 WITH CHECK (
   bucket_id = 'uploads' AND (
+    -- 본인 폴더에 업로드
     (storage.foldername(name))[1] = ((select auth.jwt())->>'sub')
     OR
-    EXISTS (
-      SELECT 1 FROM public.clients
-      WHERE clients.clerk_user_id = (storage.foldername(name))[1]
-      AND EXISTS (
+    -- 권한 부여된 클라이언트의 폴더에 업로드
+    -- ⚠️ 핵심: IN 절을 사용하여 name이 storage.objects에서 오는 것을 명확히 함
+    (storage.foldername(name))[1] IN (
+      SELECT clients.clerk_user_id
+      FROM public.clients
+      WHERE EXISTS (
         SELECT 1 FROM public.client_authorizations
         WHERE client_authorizations.client_id = clients.id
         AND client_authorizations.authorized_clerk_user_id = ((select auth.jwt())->>'sub')
@@ -302,13 +316,26 @@ WITH CHECK (
   )
 );
 
--- SELECT, DELETE, UPDATE 정책들도 동일하게 수정
+-- SELECT, DELETE, UPDATE 정책들도 동일한 구조로 생성
 ```
+
+**핵심 해결 포인트**:
+
+1. **Supabase 공식 문서 확인**: [Storage Helper Functions](https://supabase.com/docs/guides/storage/schema/helper-functions)에서 `storage.foldername(name)`의 `name`은 `storage.objects` 테이블의 `name` 컬럼(파일 경로)을 의미함을 확인
+2. **서브쿼리 구조 변경**: `EXISTS` 서브쿼리에서 `WHERE clients.clerk_user_id = (storage.foldername(name))[1]` 대신 `IN` 절을 사용하여 `(storage.foldername(name))[1] IN (SELECT clients.clerk_user_id ...)` 구조로 변경
+3. **이름 해석 명확화**: `IN` 절을 사용하면 PostgreSQL이 `name`을 `storage.objects.name`으로 올바르게 해석함
 
 **해결 결과**:
 
-- 권한 부여된 사용자가 클라이언트의 파일을 정상적으로 업로드할 수 있게 됨
-- Storage RLS 정책이 올바르게 작동하여 보안과 기능이 모두 유지됨
+- ✅ 권한 부여된 사용자가 클라이언트의 파일을 정상적으로 업로드할 수 있게 됨
+- ✅ Storage RLS 정책이 올바르게 작동하여 보안과 기능이 모두 유지됨
+- ✅ 모든 정책이 "✅ 올바름: name 사용"으로 확인됨
+- ✅ `policy_preview`에서 `storage.foldername(name)`이 올바르게 사용되는 것을 확인
+
+**참고 파일**:
+
+- `FINAL_CORRECT_FIX.sql`: 최종 해결 SQL 파일
+- `CORRECT_STORAGE_POLICY.sql`: Supabase 공식 문서 기준 정책
 
 ## 참고 자료
 
