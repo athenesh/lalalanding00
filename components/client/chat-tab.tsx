@@ -26,6 +26,10 @@ import { Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import ListingCard from "@/components/client/listing-card";
+import { X, RotateCcw } from "lucide-react"; // 아이콘 추가
+import { updateListingExcluded } from "@/actions/listing-excluded";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface Message {
   id: string;
@@ -47,6 +51,7 @@ interface Listing {
   thumbnail_url: string | null;
   notes: string | null;
   created_at: string | null;
+  is_excluded?: boolean; // 추가
 }
 
 interface ChatTabProps {
@@ -103,7 +108,46 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
             prevListingsDataRef.current = "[]";
             return;
           }
-          throw new Error("Failed to load messages");
+
+          // 응답이 HTML인지 확인
+          const contentType = response.headers.get("content-type");
+          if (contentType && !contentType.includes("application/json")) {
+            // HTML 응답인 경우 (에러 페이지 등)
+            const text = await response.text();
+            console.error("[ChatTab] HTML 응답 수신:", {
+              status: response.status,
+              contentType,
+              preview: text.substring(0, 200),
+            });
+
+            // 인증 에러인 경우 조용히 처리 (리다이렉트될 수 있음)
+            if (response.status === 401 || response.status === 403) {
+              console.warn("[ChatTab] 인증 실패, 조용히 처리");
+              return;
+            }
+
+            throw new Error(
+              `서버 오류 (${response.status}): HTML 응답을 받았습니다.`,
+            );
+          }
+
+          // JSON 에러 응답인 경우
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.error || `Failed to load messages (${response.status})`,
+          );
+        }
+
+        // Content-Type 확인
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          // JSON이 아닌 응답인 경우
+          const text = await response.text();
+          console.error("[ChatTab] JSON이 아닌 응답 수신:", {
+            contentType,
+            preview: text.substring(0, 200),
+          });
+          throw new Error("서버가 JSON이 아닌 응답을 반환했습니다.");
         }
 
         const data = await response.json();
@@ -180,11 +224,32 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
           return;
         }
 
+        // JSON 파싱 에러인 경우 특별 처리
+        if (error instanceof SyntaxError && error.message.includes("JSON")) {
+          console.error("[ChatTab] JSON 파싱 실패:", error);
+          // 폴링 중이면 조용히 처리 (초기 로드가 아닐 때)
+          if (!isInitial) {
+            console.warn("[ChatTab] 폴링 중 JSON 파싱 실패, 조용히 처리");
+            return;
+          }
+          // 초기 로드 시에만 에러 표시
+          toastRef.current({
+            title: "오류",
+            description:
+              "서버 응답 형식이 올바르지 않습니다. 페이지를 새로고침해주세요.",
+            variant: "destructive",
+          });
+          return;
+        }
+
         console.error("[ChatTab] 메시지 로드 실패:", error);
         // toastRef를 사용하여 의존성 문제 해결
         toastRef.current({
           title: "오류",
-          description: "메시지를 불러오는데 실패했습니다.",
+          description:
+            error instanceof Error
+              ? error.message
+              : "메시지를 불러오는데 실패했습니다.",
           variant: "destructive",
         });
       } finally {
@@ -328,23 +393,159 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
     return timeB - timeA; // 최신부터 오래된 순서
   });
 
-  // 그리드 레이아웃을 위한 행 분할
-  // 4개씩 묶어서 행으로 만들기
-  // sortedListings는 이미 최신->오래된 순서이므로, 각 행은 그대로 사용
-  // CSS Grid는 왼쪽->오른쪽으로 채워지므로, [16,15,14,13] 순서면 왼쪽에 16, 오른쪽에 13이 됨
-  const getGridRows = () => {
+  // 제외된 리스팅 ID를 관리하는 Set
+  const [excludedListingIds, setExcludedListingIds] = useState<Set<string>>(
+    new Set(),
+  );
+
+  // 제외된 리스팅 표시 여부 (필터링 옵션)
+  const [showExcluded, setShowExcluded] = useState(true);
+
+  // 로컬 스토리지 키 (클라이언트별로 구분)
+  const storageKey = clientId
+    ? `excluded_listings_${clientId}`
+    : `excluded_listings_${userType}`;
+
+  // 로컬 스토리지에서 제외 상태 로드
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const excludedIds = JSON.parse(stored) as string[];
+        setExcludedListingIds(new Set(excludedIds));
+        console.log("[ChatTab] 로컬 스토리지에서 제외 상태 로드:", {
+          count: excludedIds.length,
+        });
+      }
+    } catch (error) {
+      console.error("[ChatTab] 로컬 스토리지 로드 실패:", error);
+    }
+  }, [storageKey]);
+
+  // 로컬 스토리지에 제외 상태 저장
+  const saveToLocalStorage = (excludedIds: Set<string>) => {
+    try {
+      const array = Array.from(excludedIds);
+      localStorage.setItem(storageKey, JSON.stringify(array));
+      console.log("[ChatTab] 로컬 스토리지에 제외 상태 저장:", {
+        count: array.length,
+      });
+    } catch (error) {
+      console.error("[ChatTab] 로컬 스토리지 저장 실패:", error);
+    }
+  };
+
+  // 서버에서 제외 상태 로드 (리스팅 데이터와 함께)
+  useEffect(() => {
+    // 리스팅 데이터가 로드되면 서버의 is_excluded 상태를 확인
+    if (listings.length > 0) {
+      const serverExcludedIds = new Set<string>();
+      listings.forEach((listing) => {
+        if (listing.is_excluded) {
+          serverExcludedIds.add(listing.id);
+        }
+      });
+
+      // 서버 상태와 로컬 스토리지 상태 병합
+      setExcludedListingIds((prev) => {
+        const merged = new Set([...prev, ...serverExcludedIds]);
+        saveToLocalStorage(merged);
+        return merged;
+      });
+    }
+  }, [listings]);
+
+  // 제외 상태 토글 함수 (로컬 + 서버 동기화)
+  const toggleExclude = async (listingId: string) => {
+    const newExcluded = !excludedListingIds.has(listingId);
+
+    // 즉시 UI 업데이트 (낙관적 업데이트)
+    setExcludedListingIds((prev) => {
+      const newSet = new Set(prev);
+      if (newExcluded) {
+        newSet.add(listingId);
+      } else {
+        newSet.delete(listingId);
+      }
+      saveToLocalStorage(newSet);
+      return newSet;
+    });
+
+    // 서버에 동기화
+    try {
+      console.log("[ChatTab] 서버에 제외 상태 동기화 시작:", {
+        listingId,
+        isExcluded: newExcluded,
+      });
+
+      const result = await updateListingExcluded(listingId, newExcluded);
+
+      if (result.success) {
+        console.log("[ChatTab] 서버 동기화 성공:", {
+          listingId,
+          isExcluded: newExcluded,
+        });
+      } else {
+        console.error("[ChatTab] 서버 동기화 실패:", result.error);
+        toast({
+          title: "동기화 실패",
+          description:
+            result.error || "제외 상태를 서버에 저장하지 못했습니다.",
+          variant: "destructive",
+        });
+
+        // 실패 시 이전 상태로 복원
+        setExcludedListingIds((prev) => {
+          const newSet = new Set(prev);
+          if (newExcluded) {
+            newSet.delete(listingId);
+          } else {
+            newSet.add(listingId);
+          }
+          saveToLocalStorage(newSet);
+          return newSet;
+        });
+      }
+    } catch (error) {
+      console.error("[ChatTab] 서버 동기화 중 예상치 못한 에러:", error);
+      toast({
+        title: "동기화 실패",
+        description: "제외 상태를 저장하는 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+
+      // 실패 시 이전 상태로 복원
+      setExcludedListingIds((prev) => {
+        const newSet = new Set(prev);
+        if (newExcluded) {
+          newSet.delete(listingId);
+        } else {
+          newSet.add(listingId);
+        }
+        saveToLocalStorage(newSet);
+        return newSet;
+      });
+    }
+  };
+
+  // 필터링된 리스팅 목록
+  const filteredListings = showExcluded
+    ? sortedListings
+    : sortedListings.filter((listing) => !excludedListingIds.has(listing.id));
+
+  // 필터링된 리스팅으로 그리드 행 생성
+  const getFilteredGridRows = () => {
     const rows: Listing[][] = [];
     const itemsPerRow = 4;
 
-    for (let i = 0; i < sortedListings.length; i += itemsPerRow) {
-      rows.push(sortedListings.slice(i, i + itemsPerRow));
+    for (let i = 0; i < filteredListings.length; i += itemsPerRow) {
+      rows.push(filteredListings.slice(i, i + itemsPerRow));
     }
 
-    // 행들은 위에서 아래로 배치 (정순)
     return rows;
   };
 
-  const gridRows = getGridRows();
+  const gridRows = getFilteredGridRows();
 
   return (
     <div className="flex flex-col min-h-[500px] max-h-[700px] bg-background rounded-lg border border-border w-full">
@@ -422,31 +623,80 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
         </div>
       </div>
 
-      {/* 리스팅 카드 섹션 (입력창 아래, 최신이 상단 왼쪽, 오래된 것이 하단 오른쪽) */}
+      {/* 리스팅 카드 섹션 */}
       {sortedListings.length > 0 && (
         <div className="p-4 border-t border-border bg-muted/30 max-w-full">
+          {/* 필터링 옵션 */}
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="show-excluded"
+                checked={showExcluded}
+                onCheckedChange={setShowExcluded}
+              />
+              <Label htmlFor="show-excluded" className="text-sm cursor-pointer">
+                제외된 리스팅 표시
+              </Label>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {excludedListingIds.size > 0 && (
+                <span>
+                  제외됨: {excludedListingIds.size}개 / 전체:{" "}
+                  {sortedListings.length}개
+                </span>
+              )}
+            </div>
+          </div>
+
           <div className="flex flex-col gap-1 sm:gap-2 md:gap-4">
             {gridRows.map((row, rowIndex) => (
               <div
                 key={rowIndex}
                 className="grid grid-cols-4 gap-1 sm:gap-2 md:gap-4"
               >
-                {row.map((listing) => (
-                  <div key={listing.id} className="col-span-1 min-w-0">
-                    <ListingCard
-                      id={listing.id}
-                      address={listing.address}
-                      price={listing.price}
-                      bedrooms={listing.bedrooms}
-                      bathrooms={listing.bathrooms}
-                      square_feet={listing.square_feet}
-                      title={listing.title}
-                      thumbnail_url={listing.thumbnail_url}
-                      listing_url={listing.listing_url}
-                      notes={listing.notes}
-                    />
-                  </div>
-                ))}
+                {row.map((listing) => {
+                  const isExcluded = excludedListingIds.has(listing.id);
+
+                  return (
+                    <div
+                      key={listing.id}
+                      className="col-span-1 min-w-0 flex flex-col gap-2"
+                    >
+                      <ListingCard
+                        id={listing.id}
+                        address={listing.address}
+                        price={listing.price}
+                        bedrooms={listing.bedrooms}
+                        bathrooms={listing.bathrooms}
+                        square_feet={listing.square_feet}
+                        title={listing.title}
+                        thumbnail_url={listing.thumbnail_url}
+                        listing_url={listing.listing_url}
+                        notes={listing.notes}
+                        isExcluded={isExcluded}
+                      />
+                      {/* 제외 표시 토글 버튼 */}
+                      <Button
+                        variant={isExcluded ? "destructive" : "outline"}
+                        size="sm"
+                        onClick={() => toggleExclude(listing.id)}
+                        className="w-full text-xs sm:text-sm"
+                      >
+                        {isExcluded ? (
+                          <>
+                            <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                            제외 해제
+                          </>
+                        ) : (
+                          <>
+                            <X className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                            제외 표시
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </div>

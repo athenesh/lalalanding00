@@ -3,13 +3,20 @@ import { getAuthUserId, getAuthRole } from "@/lib/auth";
 import { createClerkSupabaseClient } from "@/lib/supabase/server";
 import { fetchListingFromText } from "@/actions/gemini-listing";
 import { extractListingUrls } from "@/lib/listing/url-parser";
-import { postMessageSchema, getMessagesQuerySchema } from "@/lib/validations/api-schemas";
-import { logAuthFailure, logPermissionDenied, logInvalidInput } from "@/lib/logging/security-events";
+import {
+  postMessageSchema,
+  getMessagesQuerySchema,
+} from "@/lib/validations/api-schemas";
+import {
+  logAuthFailure,
+  logPermissionDenied,
+  logInvalidInput,
+} from "@/lib/logging/security-events";
 
 /**
  * POST /api/messages
  * 메시지를 전송하고, URL이 포함된 경우 리스팅 정보를 가져와 저장합니다.
- * 
+ *
  * 요청 본문:
  * {
  *   "content": "메시지 내용",
@@ -25,24 +32,21 @@ export async function POST(request: Request) {
     const supabase = createClerkSupabaseClient();
 
     if (!role) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
-    
+
     // Zod 스키마로 입력 검증
     const validationResult = postMessageSchema.safeParse(body);
     if (!validationResult.success) {
       logInvalidInput("/api/messages", validationResult.error.errors, userId);
       return NextResponse.json(
-        { 
+        {
           error: "Invalid request body",
-          details: validationResult.error.errors 
+          details: validationResult.error.errors,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -60,10 +64,13 @@ export async function POST(request: Request) {
         .single();
 
       if (clientError || !client) {
-        console.error("[API] Client not found:", { userId, error: clientError });
+        console.error("[API] Client not found:", {
+          userId,
+          error: clientError,
+        });
         return NextResponse.json(
           { error: "Client not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -73,7 +80,7 @@ export async function POST(request: Request) {
       if (!client_id) {
         return NextResponse.json(
           { error: "client_id is required for agents" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -87,7 +94,7 @@ export async function POST(request: Request) {
       if (!account) {
         return NextResponse.json(
           { error: "Agent account not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -106,16 +113,13 @@ export async function POST(request: Request) {
         });
         return NextResponse.json(
           { error: "Client not found or access denied" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
       targetClientId = client.id;
     } else {
-      return NextResponse.json(
-        { error: "Invalid role" },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "Invalid role" }, { status: 403 });
     }
 
     // 채팅방 찾기 또는 생성
@@ -133,7 +137,7 @@ export async function POST(request: Request) {
       console.error("[API] 채팅방 조회 실패:", roomFindError);
       return NextResponse.json(
         { error: "Failed to find chat room" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -155,7 +159,7 @@ export async function POST(request: Request) {
         });
         return NextResponse.json(
           { error: "Client not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -180,12 +184,15 @@ export async function POST(request: Request) {
             error: "Failed to create chat room",
             details: createRoomError?.message || "Unknown error",
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
 
       roomId = newRoom.id;
-      console.log("[API] 새 채팅방 생성:", { roomId, clientId: targetClientId });
+      console.log("[API] 새 채팅방 생성:", {
+        roomId,
+        clientId: targetClientId,
+      });
     }
 
     // 메시지 저장
@@ -204,7 +211,7 @@ export async function POST(request: Request) {
       console.error("[API] 메시지 저장 실패:", messageError);
       return NextResponse.json(
         { error: "Failed to send message" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -225,7 +232,8 @@ export async function POST(request: Request) {
     });
 
     // URL이 있으면 URL 사용, 없으면 전체 텍스트 사용
-    const textToExtract = listingUrls.length > 0 ? listingUrls[0] : content.trim();
+    const textToExtract =
+      listingUrls.length > 0 ? listingUrls[0] : content.trim();
     const listingUrl = listingUrls.length > 0 ? listingUrls[0] : undefined;
 
     // 메시지에 리스팅 관련 정보가 있을 가능성이 있는지 확인
@@ -247,7 +255,10 @@ export async function POST(request: Request) {
           listingUrl,
         });
 
-        const listingData = await fetchListingFromText(textToExtract, listingUrl);
+        const listingData = await fetchListingFromText(
+          textToExtract,
+          listingUrl,
+        );
 
         if (listingData) {
           console.log("[API] Gemini API 리스팅 정보 추출 성공:", {
@@ -276,7 +287,10 @@ export async function POST(request: Request) {
 
           // square_feet 컬럼이 있는 경우에만 추가
           // (마이그레이션이 적용되지 않은 경우를 대비)
-          if (listingData.square_feet !== null && listingData.square_feet !== undefined) {
+          if (
+            listingData.square_feet !== null &&
+            listingData.square_feet !== undefined
+          ) {
             insertData.square_feet = listingData.square_feet;
           }
 
@@ -322,7 +336,9 @@ export async function POST(request: Request) {
             }
           }
         } else {
-          console.log("[API] Gemini API가 리스팅 정보를 추출하지 못함 (null 반환)");
+          console.log(
+            "[API] Gemini API가 리스팅 정보를 추출하지 못함 (null 반환)",
+          );
         }
       } catch (error) {
         console.error("[API] Gemini API 리스팅 정보 추출 실패:", {
@@ -349,7 +365,7 @@ export async function POST(request: Request) {
     console.error("[API] Error in POST /api/messages:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -357,7 +373,7 @@ export async function POST(request: Request) {
 /**
  * GET /api/messages
  * 채팅방의 메시지 목록을 조회합니다.
- * 
+ *
  * 쿼리 파라미터:
  * - client_id: 클라이언트 ID (에이전트인 경우 필수)
  * - limit: 페이지당 메시지 수 (기본: 50)
@@ -372,34 +388,38 @@ export async function GET(request: Request) {
     const supabase = createClerkSupabaseClient();
 
     if (!role) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
-    
+
     // Zod 스키마로 쿼리 파라미터 검증
     const queryParams = {
       client_id: searchParams.get("client_id") || undefined,
       limit: searchParams.get("limit") || undefined,
       offset: searchParams.get("offset") || undefined,
     };
-    
+
     const queryValidationResult = getMessagesQuerySchema.safeParse(queryParams);
     if (!queryValidationResult.success) {
-      console.warn("[API] Invalid query parameters:", queryValidationResult.error.errors);
+      console.warn(
+        "[API] Invalid query parameters:",
+        queryValidationResult.error.errors,
+      );
       return NextResponse.json(
-        { 
+        {
           error: "Invalid query parameters",
-          details: queryValidationResult.error.errors 
+          details: queryValidationResult.error.errors,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const { client_id: clientIdParam, limit, offset } = queryValidationResult.data;
+    const {
+      client_id: clientIdParam,
+      limit,
+      offset,
+    } = queryValidationResult.data;
 
     // 클라이언트 ID 결정
     let targetClientId: string;
@@ -414,7 +434,7 @@ export async function GET(request: Request) {
       if (clientError || !client) {
         return NextResponse.json(
           { error: "Client not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -423,7 +443,7 @@ export async function GET(request: Request) {
       if (!clientIdParam) {
         return NextResponse.json(
           { error: "client_id is required for agents" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -436,7 +456,7 @@ export async function GET(request: Request) {
       if (!account) {
         return NextResponse.json(
           { error: "Agent account not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -450,16 +470,13 @@ export async function GET(request: Request) {
       if (clientError || !client) {
         return NextResponse.json(
           { error: "Client not found or access denied" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
       targetClientId = client.id;
     } else {
-      return NextResponse.json(
-        { error: "Invalid role" },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "Invalid role" }, { status: 403 });
     }
 
     // 채팅방 찾기
@@ -494,7 +511,7 @@ export async function GET(request: Request) {
       });
       return NextResponse.json(
         { error: "Failed to fetch messages" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -506,9 +523,11 @@ export async function GET(request: Request) {
     // 리스팅 정보 조회
     const { data: listings, error: listingsError } = await supabase
       .from("shared_listings")
-      .select("*")
+      .select(
+        "id, listing_url, address, price, bedrooms, bathrooms, square_feet, title, thumbnail_url, notes, created_at, is_excluded",
+      ) // is_excluded 추가
       .eq("room_id", room.id)
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: false });
 
     if (listingsError) {
       console.error("[API] 리스팅 조회 실패:", {
@@ -537,8 +556,7 @@ export async function GET(request: Request) {
     console.error("[API] Error in GET /api/messages:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-

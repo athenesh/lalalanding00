@@ -34,6 +34,7 @@ export interface ListingCardProps {
   listing_url: string;
   notes: string | null;
   className?: string;
+  isExcluded?: boolean; // 추가
 }
 
 /**
@@ -94,6 +95,7 @@ export default function ListingCard({
   listing_url,
   notes: initialNotes,
   className,
+  isExcluded = false, // 추가
 }: ListingCardProps) {
   const [notes, setNotes] = useState<string | null>(initialNotes);
   const [isEditing, setIsEditing] = useState(false);
@@ -214,12 +216,41 @@ export default function ListingCard({
   return (
     <div
       className={cn(
-        "w-full min-w-0 bg-white shadow-xl overflow-hidden border border-gray-300",
+        "w-full min-w-0 bg-white shadow-xl overflow-hidden border border-gray-300 relative", // relative 추가
         className,
       )}
     >
+      {/* 제외 오버레이 (빨간색 X) */}
+      {isExcluded && (
+        <div className="absolute inset-0 bg-red-500/20 z-10 flex items-center justify-center pointer-events-none">
+          <div className="relative">
+            {/* X 표시 */}
+            <svg
+              className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 text-red-600"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="4"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+            {/* 배경 원 (선택사항) */}
+            <div className="absolute inset-0 bg-white/50 rounded-full -z-10 scale-150" />
+          </div>
+        </div>
+      )}
+
       {/* Content Body (반응형 패딩 및 텍스트 크기, 모바일 최적화) */}
-      <div className="p-2 sm:p-4 md:p-6 lg:p-8 flex flex-col items-center justify-center text-center">
+      <div
+        className={cn(
+          "p-2 sm:p-4 md:p-6 lg:p-8 flex flex-col items-center justify-center text-center",
+          isExcluded && "opacity-60", // 제외된 경우 약간 투명하게
+        )}
+      >
         {/* Unit Name (e.g. B6) */}
         <div className="text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl 2xl:text-3xl 3xl:text-4xl font-normal text-black mb-1 sm:mb-2">
           {unitName}
