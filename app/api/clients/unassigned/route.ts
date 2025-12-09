@@ -49,10 +49,11 @@ export async function GET() {
       );
     }
 
-    // 할당되지 않은 클라이언트 목록 조회 (owner_agent_id가 null)
-    console.log("[API] 할당되지 않은 클라이언트 목록 조회 시도");
+    // 할당 가능한 클라이언트 목록 조회 (assignable_clients 뷰 사용)
+    // 배우자로 등록된 클라이언트와 권한을 받은 클라이언트는 자동으로 제외됨
+    console.log("[API] 할당 가능한 클라이언트 목록 조회 시도 (뷰 사용)");
     const { data: clients, error: clientsError } = await supabase
-      .from("clients")
+      .from("assignable_clients")
       .select(
         `
         id,
@@ -68,7 +69,6 @@ export async function GET() {
         clerk_user_id
       `,
       )
-      .is("owner_agent_id", null)
       .order("created_at", { ascending: false });
 
     if (clientsError) {
@@ -91,7 +91,7 @@ export async function GET() {
       );
     }
 
-    console.log("[API] 할당되지 않은 클라이언트 목록 조회 성공:", {
+    console.log("[API] 할당 가능한 클라이언트 목록 조회 성공 (배우자 제외):", {
       clientCount: clients?.length || 0,
     });
 
