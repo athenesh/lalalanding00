@@ -99,43 +99,45 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="area">희망 지역</Label>
-          <Input
-            id="area"
-            value={formData.preferredArea}
-            onChange={(e) =>
-              setFormData({ ...formData, preferredArea: e.target.value })
-            }
-            placeholder="예: 로스앤젤레스, CA"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="budget">최대 예산 (USD/월)</Label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-              $
-            </span>
+        <div className="flex flex-row gap-4">
+          <div className="space-y-2 flex-1">
+            <Label htmlFor="area">희망 지역</Label>
             <Input
-              id="budget"
-              type="number"
-              value={formData.maxBudget}
+              id="area"
+              value={formData.preferredArea}
               onChange={(e) =>
-                setFormData({ ...formData, maxBudget: e.target.value })
+                setFormData({ ...formData, preferredArea: e.target.value })
               }
-              placeholder="3000"
-              className="pl-8"
+              placeholder="예: 로스앤젤레스, CA"
             />
           </div>
-          <p className="text-sm text-muted-foreground">
-            💡 월 임대료 기준입니다
-          </p>
+
+          <div className="space-y-2 flex-1">
+            <Label htmlFor="budget">최대 예산 (USD/월)</Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                $
+              </span>
+              <Input
+                id="budget"
+                type="number"
+                value={formData.maxBudget}
+                onChange={(e) =>
+                  setFormData({ ...formData, maxBudget: e.target.value })
+                }
+                placeholder="3000"
+                className="pl-8"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              💡 월 임대료 기준입니다
+            </p>
+          </div>
         </div>
 
         <div className="space-y-3">
           <Label>주거 형태</Label>
-          <div className="space-y-3">
+          <div className="flex flex-row gap-4 flex-wrap">
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="apartment"
@@ -226,7 +228,7 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
       {/* 편의 시설 섹션 */}
       <div className="space-y-4 pt-6 border-t">
         <h3 className="text-lg font-semibold">편의 시설</h3>
-        <div className="space-y-4">
+        <div className="flex flex-row gap-4 flex-wrap">
           <div className="flex items-center space-x-2">
             <Checkbox
               id="furnished"
@@ -254,7 +256,7 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
             >
               세탁기/건조기
             </Label>
-            <span className="text-xs text-muted-foreground ml-2">
+            <span className="text-xs text-muted-foreground ml-2 whitespace-nowrap">
               세탁기와 건조기가 있는 집은 시세보다 비쌀 수도 있습니다
             </span>
           </div>
@@ -275,30 +277,30 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
               주차장
             </Label>
           </div>
-
-          {formData.parking && (
-            <div className="space-y-3 ml-6">
-              <Label>차량 수</Label>
-              <div className="flex gap-2 flex-wrap">
-                {["1", "2", "3", "4+"].map((num) => (
-                  <Button
-                    key={num}
-                    type="button"
-                    variant={
-                      formData.parkingCount === num ? "default" : "outline"
-                    }
-                    onClick={() =>
-                      setFormData({ ...formData, parkingCount: num })
-                    }
-                    className="flex-1 min-w-[80px]"
-                  >
-                    {num}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
+
+        {formData.parking && (
+          <div className="space-y-3 ml-6">
+            <Label>차량 수</Label>
+            <div className="flex gap-2 flex-wrap">
+              {["1", "2", "3", "4+"].map((num) => (
+                <Button
+                  key={num}
+                  type="button"
+                  variant={
+                    formData.parkingCount === num ? "default" : "outline"
+                  }
+                  onClick={() =>
+                    setFormData({ ...formData, parkingCount: num })
+                  }
+                  className="flex-1 min-w-[80px]"
+                >
+                  {num}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 특별 요구사항 섹션 */}

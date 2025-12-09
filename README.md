@@ -238,6 +238,23 @@ cp .env.example .env
    NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL="/"
    ```
 
+**6-5. 채팅 폴링 설정 (선택사항)**
+
+채팅 기능의 폴링 간격을 조정하려면 다음 환경 변수를 설정할 수 있습니다 (기본값 사용 가능):
+
+```env
+# 폴링 간격 (밀리초, 기본값: 5000 = 5초)
+NEXT_PUBLIC_CHAT_POLLING_INTERVAL=5000
+
+# 최대 재시도 횟수 (기본값: 5)
+NEXT_PUBLIC_CHAT_MAX_RETRY_COUNT=5
+
+# 백오프 배수 (연속 실패 시 간격 증가 배수, 기본값: 2)
+NEXT_PUBLIC_CHAT_BACKOFF_MULTIPLIER=2
+```
+
+> **💡 참고**: 이 변수들은 선택사항이며, 설정하지 않으면 기본값이 사용됩니다. 프로덕션 환경에서 Vercel 대시보드를 통해 쉽게 조정할 수 있습니다.
+
 #### 7. Cursor MCP 설정 (선택사항)
 
 > Cursor AI를 사용하는 경우, Supabase MCP 서버를 설정하면 AI가 데이터베이스를 직접 조회하고 관리할 수 있습니다.

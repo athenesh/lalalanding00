@@ -114,6 +114,15 @@
 - `GEMINI_API_KEY`: Gemini API 키 (서버 사이드 전용)
 - `BRIDGE_DATA_API_KEY`: Bridge Data API 키 (서버 사이드 전용)
 
+#### 채팅 폴링 설정 (선택사항)
+
+- `NEXT_PUBLIC_CHAT_POLLING_INTERVAL`: 폴링 간격 (밀리초, 기본값: 5000)
+  - 최소값: 1000ms (1초) 권장
+  - 최대값: 60000ms (60초) 권장
+- `NEXT_PUBLIC_CHAT_MAX_RETRY_COUNT`: 최대 재시도 횟수 (기본값: 5)
+- `NEXT_PUBLIC_CHAT_BACKOFF_MULTIPLIER`: 백오프 배수 (기본값: 2)
+  - 연속 실패 시 폴링 간격을 증가시키는 배수
+
 ### 보안 체크리스트
 
 #### Service Role Key 보안

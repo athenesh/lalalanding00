@@ -62,6 +62,7 @@ GRANT ALL ON TABLE public.users TO service_role;
 ```
 
 **확인 방법**:
+
 - Supabase Dashboard → **Table Editor**에서 `users` 테이블이 생성되었는지 확인
 - 애플리케이션을 다시 실행하고 로그인 시도
 - 콘솔에서 "Failed to sync user" 오류가 사라졌는지 확인
@@ -73,6 +74,7 @@ GRANT ALL ON TABLE public.users TO service_role;
 **마이그레이션 파일**: `supabase/migrations/create_main_schema.sql`
 
 **생성되는 테이블**:
+
 - `accounts` - 에이전트 계정
 - `clients` - 클라이언트 정보
 - `housing_requirements` - 주거 요구사항
@@ -84,36 +86,40 @@ GRANT ALL ON TABLE public.users TO service_role;
 #### SQL 에러 수정
 
 **문제 1**: `operator does not exist: text ->> unknown`
+
 - 원인: `auth.jwt() ->> 'metadata' ->> 'role'` 구문이 잘못됨
 - 해결: JSONB에서 중첩된 객체 접근 시 `->`와 `->>`를 올바르게 조합
+
   ```sql
   -- 잘못된 구문
   auth.jwt() ->> 'metadata' ->> 'role'
-  
+
   -- 올바른 구문
   (auth.jwt()->'metadata'->>'role')
   ```
 
 **문제 2**: `FOR ALL`은 PostgreSQL에서 지원되지 않음
+
 - 원인: RLS 정책에서 `FOR ALL` 사용 불가
 - 해결: 각 작업(SELECT, INSERT, UPDATE, DELETE)별로 정책을 분리
+
   ```sql
   -- 잘못된 구문
   CREATE POLICY "Agents can manage housing for own clients"
     ON public.housing_requirements FOR ALL
     ...
-  
+
   -- 올바른 구문
   CREATE POLICY "Agents can view housing for own clients"
     ON public.housing_requirements FOR SELECT
     TO authenticated
     ...
-  
+
   CREATE POLICY "Agents can update housing for own clients"
     ON public.housing_requirements FOR UPDATE
     TO authenticated
     ...
-  
+
   CREATE POLICY "Agents can insert housing for own clients"
     ON public.housing_requirements FOR INSERT
     TO authenticated
@@ -121,9 +127,11 @@ GRANT ALL ON TABLE public.users TO service_role;
   ```
 
 **문제 3**: RLS 정책에 `TO authenticated` 명시 필요
+
 - 모든 RLS 정책에 `TO authenticated`를 명시적으로 추가
 
 **확인 방법**:
+
 - Supabase Dashboard → **Table Editor**에서 모든 테이블이 생성되었는지 확인
 - 애플리케이션을 다시 실행하고 테스트
 
@@ -151,11 +159,13 @@ COMMENT ON COLUMN public.clients.moving_type IS '이주 형태: 가족 동반 �
 ```
 
 **참고사항**:
+
 - `moving_type` 필드는 NULL을 허용합니다 (기존 데이터 호환성)
 - 값은 '가족 동반' 또는 '단독 이주'입니다
 - 기존 `relocation_type` 필드는 "이주 목적"으로 사용됩니다 (주재원, 학업, 출장)
 
 **확인 방법**:
+
 - Supabase Dashboard → **Table Editor** → `clients` 테이블 선택
 - `moving_type` 컬럼이 추가되었는지 확인
 - 애플리케이션을 다시 실행하고 프로필 페이지에서 이주 형태 선택 기능이 작동하는지 확인
@@ -207,4 +217,3 @@ CHECK (relocation_type IS NULL OR relocation_type IN ('주재원', '학업', '�
 1. Supabase Dashboard → **Table Editor**에서 테이블과 컬럼이 올바르게 생성/수정되었는지 확인
 2. 애플리케이션을 다시 실행하고 관련 기능이 정상 작동하는지 테스트
 3. 브라우저 콘솔에서 에러 메시지 확인
-

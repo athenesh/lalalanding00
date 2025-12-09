@@ -30,6 +30,7 @@ import { X, RotateCcw } from "lucide-react"; // 아이콘 추가
 import { updateListingExcluded } from "@/actions/listing-excluded";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { CHAT_CONFIG } from "@/lib/config/chat";
 
 interface Message {
   id: string;
@@ -262,26 +263,148 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
     [clientId],
   );
 
-  // 초기 로드 및 폴링 (최적화됨)
+  // 초기 로드 및 폴링 (개선됨: 자동 복구, 백오프, 포커스 감지)
   useEffect(() => {
-    loadMessages(true); // 초기 로드
+    let intervalId: NodeJS.Timeout | null = null;
+    let retryCount = 0;
+    let isPollingActive = true;
 
-    // 5초마다 새 메시지 확인 (폴링)
-    // 데이터 변경이 없으면 상태 업데이트를 스킵하여 깜빡거림 방지
-    const interval = setInterval(() => {
-      loadMessages(false).catch((error) => {
-        // 연결 실패 시 에러 로그만 출력하고 계속 시도
-        // (서버가 재시작되면 자동으로 복구됨)
-        if (error instanceof TypeError && error.message.includes("fetch")) {
-          // 네트워크 에러는 조용히 처리 (콘솔 스팸 방지)
-          return;
+    const startPolling = () => {
+      // 페이지가 숨겨져 있거나 오프라인일 때는 폴링 중지
+      if (document.hidden || !navigator.onLine) {
+        console.log("[ChatTab] 폴링 일시 중지:", {
+          hidden: document.hidden,
+          online: navigator.onLine,
+        });
+        return;
+      }
+
+      // 기존 interval이 있으면 정리
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+
+      // 재시도 카운트에 따라 간격 조정 (백오프 적용)
+      const currentInterval =
+        retryCount > 0
+          ? CHAT_CONFIG.POLLING_INTERVAL *
+            Math.pow(CHAT_CONFIG.BACKOFF_MULTIPLIER, retryCount)
+          : CHAT_CONFIG.POLLING_INTERVAL;
+
+      intervalId = setInterval(async () => {
+        if (!isPollingActive) return;
+
+        try {
+          await loadMessages(false);
+          // 성공 시 재시도 카운터 리셋
+          if (retryCount > 0) {
+            console.log("[ChatTab] 폴링 복구 성공, 정상 간격으로 복귀");
+            retryCount = 0;
+            startPolling(); // 정상 간격으로 재시작
+          }
+        } catch (error) {
+          retryCount++;
+
+          // 최대 재시도 횟수 초과 시
+          if (retryCount >= CHAT_CONFIG.MAX_RETRY_COUNT) {
+            console.error("[ChatTab] 폴링 실패 횟수 초과:", {
+              retryCount,
+              maxRetries: CHAT_CONFIG.MAX_RETRY_COUNT,
+            });
+
+            // 백오프 적용하여 재시작
+            const backoffInterval =
+              CHAT_CONFIG.POLLING_INTERVAL *
+              Math.pow(CHAT_CONFIG.BACKOFF_MULTIPLIER, retryCount);
+
+            if (intervalId) {
+              clearInterval(intervalId);
+              intervalId = null;
+            }
+
+            setTimeout(() => {
+              retryCount = 0; // 재시도 카운터 리셋
+              startPolling(); // 폴링 재시작
+            }, backoffInterval);
+          } else {
+            // 재시도 카운터 증가, 다음 폴링에서 간격 자동 조정됨
+            console.warn("[ChatTab] 폴링 실패:", {
+              retryCount,
+              nextInterval:
+                CHAT_CONFIG.POLLING_INTERVAL *
+                Math.pow(CHAT_CONFIG.BACKOFF_MULTIPLIER, retryCount),
+            });
+          }
         }
-        // 다른 에러는 로그 출력
-        console.error("[ChatTab] 폴링 중 에러:", error);
-      });
-    }, 5000);
+      }, currentInterval);
 
-    return () => clearInterval(interval);
+      console.log("[ChatTab] 폴링 시작:", {
+        interval: currentInterval,
+        retryCount,
+      });
+    };
+
+    // 초기 로드
+    loadMessages(true).then(() => {
+      // 초기 로드 성공 후 폴링 시작
+      startPolling();
+    });
+
+    // 페이지 가시성 변경 감지
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // 백그라운드로 갈 때 폴링 중지
+        if (intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+          console.log("[ChatTab] 페이지 숨김, 폴링 중지");
+        }
+      } else {
+        // 포그라운드로 돌아올 때 즉시 새로고침 후 폴링 재시작
+        if (!intervalId) {
+          loadMessages(true).then(() => {
+            retryCount = 0; // 재시도 카운터 리셋
+            startPolling();
+            console.log("[ChatTab] 페이지 표시, 폴링 재시작");
+          });
+        }
+      }
+    };
+
+    // 온라인/오프라인 상태 변경 감지
+    const handleOnline = () => {
+      if (!intervalId && !document.hidden) {
+        loadMessages(true).then(() => {
+          retryCount = 0;
+          startPolling();
+          console.log("[ChatTab] 온라인 상태 복구, 폴링 재시작");
+        });
+      }
+    };
+
+    const handleOffline = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+        console.log("[ChatTab] 오프라인 상태, 폴링 중지");
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    // 정리 함수
+    return () => {
+      isPollingActive = false;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
   }, [loadMessages]);
 
   // 메시지 전송
@@ -321,18 +444,22 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
       // 입력 필드 초기화
       setInputValue("");
 
-      // 리스팅이 생성된 경우 강제 업데이트 (isInitial을 true로 설정)
+      // 메시지 전송 성공 후 즉시 새로고침 (폴링 대기하지 않음)
+      // 리스팅이 생성된 경우에도 즉시 새로고침하여 사용자 경험 개선
       if (data.listing_id) {
         toast({
           title: "리스팅 정보 추가됨",
           description: "부동산 정보가 카드로 표시되었습니다.",
         });
-        // 리스팅이 생성되었으면 강제로 다시 로드 (isInitial을 true로 설정)
-        await loadMessages(true);
-      } else {
-        // 리스팅이 없으면 일반 로드
-        await loadMessages(false);
       }
+
+      // 즉시 새로고침 (isInitial을 true로 설정하여 로딩 상태 표시)
+      await loadMessages(true);
+
+      // 스크롤을 맨 아래로 (새 메시지 표시)
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
     } catch (error) {
       console.error("[ChatTab] 메시지 전송 실패:", error);
       toast({

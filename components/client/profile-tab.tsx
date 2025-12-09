@@ -598,202 +598,205 @@ export default function ProfileTab({
           <CardTitle>기본 정보</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="name">
-                이름 <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                placeholder="홍길동"
-                required
-              />
-            </div>
+          <div className="space-y-6">
+            {/* 첫 번째 줄: 이름과 생년월일 */}
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="name">
+                  이름 <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  placeholder="홍길동"
+                  required
+                />
+              </div>
 
-            <div className="space-y-2 md:col-span-2">
-              <Label>생년월일</Label>
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <Input
-                    type="number"
-                    placeholder="년도 (예: 1990)"
-                    value={birthYear}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setBirthYear(value);
-                      handleBirthDateChange(value, birthMonth, birthDay);
-                    }}
-                    min="1900"
-                    max="2100"
-                    className="text-center"
-                  />
+              <div className="space-y-2">
+                <Label>생년월일</Label>
+                <div className="flex items-center gap-1">
+                  <div className="flex-1 min-w-[60px] max-w-[120px]">
+                    <Input
+                      type="number"
+                      placeholder="년도 (예: 1990)"
+                      value={birthYear}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setBirthYear(value);
+                        handleBirthDateChange(value, birthMonth, birthDay);
+                      }}
+                      min="1900"
+                      max="2100"
+                      className="text-center text-sm md:text-base"
+                    />
+                  </div>
+                  <div className="min-w-[56px] max-w-[80px] w-14 md:w-20">
+                    <Input
+                      type="number"
+                      placeholder="월"
+                      value={birthMonth}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setBirthMonth(value);
+                        handleBirthDateChange(birthYear, value, birthDay);
+                      }}
+                      min="1"
+                      max="12"
+                      className="text-center text-sm md:text-base w-full"
+                    />
+                  </div>
+                  <div className="min-w-[56px] max-w-[80px] w-14 md:w-20">
+                    <Input
+                      type="number"
+                      placeholder="일"
+                      value={birthDay}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setBirthDay(value);
+                        handleBirthDateChange(birthYear, birthMonth, value);
+                      }}
+                      min="1"
+                      max="31"
+                      className="text-center text-sm md:text-base w-full"
+                    />
+                  </div>
                 </div>
-                <span className="text-muted-foreground">년</span>
-                <div className="w-20">
-                  <Input
-                    type="number"
-                    placeholder="월"
-                    value={birthMonth}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setBirthMonth(value);
-                      handleBirthDateChange(birthYear, value, birthDay);
-                    }}
-                    min="1"
-                    max="12"
-                    className="text-center"
-                  />
-                </div>
-                <span className="text-muted-foreground">월</span>
-                <div className="w-20">
-                  <Input
-                    type="number"
-                    placeholder="일"
-                    value={birthDay}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setBirthDay(value);
-                      handleBirthDateChange(birthYear, birthMonth, value);
-                    }}
-                    min="1"
-                    max="31"
-                    className="text-center"
-                  />
-                </div>
-                <span className="text-muted-foreground">일</span>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">
-                이메일 <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                placeholder="example@email.com"
-                required
-              />
+            {/* 두 번째 줄: 이메일과 전화번호 */}
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="email">
+                  이메일 <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                  placeholder="example@email.com"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone">전화번호</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
+                  placeholder="010-1234-5678"
+                />
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="phone">전화번호</Label>
-              <Input
-                id="phone"
-                type="tel"
-                value={formData.phone}
-                onChange={(e) =>
-                  setFormData({ ...formData, phone: e.target.value })
-                }
-                placeholder="010-1234-5678"
-              />
-            </div>
+            {/* 세 번째 줄: 직업, 이주 목적, 이주 예정일 */}
+            <div className="grid grid-cols-4 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="occupation">
+                  직업 <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={formData.occupation}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, occupation: value })
+                  }
+                  required
+                >
+                  <SelectTrigger id="occupation">
+                    <SelectValue placeholder="직업을 선택하세요" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="doctor">의사</SelectItem>
+                    <SelectItem value="employee">회사 직원</SelectItem>
+                    <SelectItem value="student">학생</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="occupation">
-                직업 <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                value={formData.occupation}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, occupation: value })
-                }
-                required
-              >
-                <SelectTrigger id="occupation">
-                  <SelectValue placeholder="직업을 선택하세요" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="doctor">의사</SelectItem>
-                  <SelectItem value="employee">회사 직원</SelectItem>
-                  <SelectItem value="student">학생</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="relocationType">
+                  이주 목적 <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={formData.relocationType}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, relocationType: value })
+                  }
+                  required
+                >
+                  <SelectTrigger id="relocationType">
+                    <SelectValue placeholder="이주 목적을 선택하세요" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="주재원">주재원</SelectItem>
+                    <SelectItem value="학업">학업</SelectItem>
+                    <SelectItem value="출장">출장</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="relocationType">
-                이주 목적 <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                value={formData.relocationType}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, relocationType: value })
-                }
-                required
-              >
-                <SelectTrigger id="relocationType">
-                  <SelectValue placeholder="이주 목적을 선택하세요" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="주재원">주재원</SelectItem>
-                  <SelectItem value="학업">학업</SelectItem>
-                  <SelectItem value="출장">출장</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <Label>
-                이주 예정일 <span className="text-destructive">*</span>
-              </Label>
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <Input
-                    type="number"
-                    placeholder="년도 (예: 2025)"
-                    value={movingYear}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setMovingYear(value);
-                      handleMovingDateChange(value, movingMonth, movingDay);
-                    }}
-                    min="1900"
-                    max="2100"
-                    className="text-center"
-                  />
+              <div className="space-y-2 col-span-2">
+                <Label>
+                  이주 예정일 <span className="text-destructive">*</span>
+                </Label>
+                <div className="flex items-center gap-1">
+                  <div className="flex-1 min-w-[60px] max-w-[120px]">
+                    <Input
+                      type="number"
+                      placeholder="년도 (예: 2025)"
+                      value={movingYear}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setMovingYear(value);
+                        handleMovingDateChange(value, movingMonth, movingDay);
+                      }}
+                      min="1900"
+                      max="2100"
+                      className="text-center text-sm md:text-base"
+                    />
+                  </div>
+                  <div className="min-w-[56px] max-w-[80px] w-14 md:w-20">
+                    <Input
+                      type="number"
+                      placeholder="월"
+                      value={movingMonth}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setMovingMonth(value);
+                        handleMovingDateChange(movingYear, value, movingDay);
+                      }}
+                      min="1"
+                      max="12"
+                      className="text-center text-sm md:text-base w-full"
+                    />
+                  </div>
+                  <div className="min-w-[56px] max-w-[80px] w-14 md:w-20">
+                    <Input
+                      type="number"
+                      placeholder="일"
+                      value={movingDay}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setMovingDay(value);
+                        handleMovingDateChange(movingYear, movingMonth, value);
+                      }}
+                      min="1"
+                      max="31"
+                      className="text-center text-sm md:text-base w-full"
+                    />
+                  </div>
                 </div>
-                <span className="text-muted-foreground">년</span>
-                <div className="w-20">
-                  <Input
-                    type="number"
-                    placeholder="월"
-                    value={movingMonth}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setMovingMonth(value);
-                      handleMovingDateChange(movingYear, value, movingDay);
-                    }}
-                    min="1"
-                    max="12"
-                    className="text-center"
-                  />
-                </div>
-                <span className="text-muted-foreground">월</span>
-                <div className="w-20">
-                  <Input
-                    type="number"
-                    placeholder="일"
-                    value={movingDay}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setMovingDay(value);
-                      handleMovingDateChange(movingYear, movingMonth, value);
-                    }}
-                    min="1"
-                    max="31"
-                    className="text-center"
-                  />
-                </div>
-                <span className="text-muted-foreground">일</span>
               </div>
             </div>
           </div>
@@ -863,259 +866,277 @@ export default function ProfileTab({
                           </Button>
                         </div>
                       </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                          <Label>
-                            이름 <span className="text-destructive">*</span>
-                          </Label>
-                          <Input
-                            value={member.name}
-                            onChange={(e) =>
-                              updateFamilyMember(
-                                member.id,
-                                "name",
-                                e.target.value,
-                              )
-                            }
-                            placeholder="이름"
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>
-                            관계 <span className="text-destructive">*</span>
-                          </Label>
-                          <Select
-                            value={member.relationship}
-                            onValueChange={(value) =>
-                              updateFamilyMember(
-                                member.id,
-                                "relationship",
-                                value,
-                              )
-                            }
-                            required
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="관계 선택" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="배우자">배우자</SelectItem>
-                              <SelectItem value="자녀">자녀</SelectItem>
-                              <SelectItem value="부모">부모</SelectItem>
-                              <SelectItem value="형제자매">형제자매</SelectItem>
-                              <SelectItem value="기타">기타</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>생년월일</Label>
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1">
+                      <CardContent>
+                        <div className="space-y-6">
+                          {/* 첫 번째 줄: 이름, 관계, 생년월일 */}
+                          <div className="grid grid-cols-4 gap-4">
+                            <div className="space-y-2">
+                              <Label>
+                                이름 <span className="text-destructive">*</span>
+                              </Label>
                               <Input
-                                type="number"
-                                placeholder="년도"
-                                value={
-                                  member.birthDate
-                                    ? member.birthDate.getFullYear().toString()
-                                    : ""
-                                }
-                                onChange={(e) => {
-                                  const year = e.target.value;
-                                  const month = member.birthDate
-                                    ? (
-                                        member.birthDate.getMonth() + 1
-                                      ).toString()
-                                    : "";
-                                  const day = member.birthDate
-                                    ? member.birthDate.getDate().toString()
-                                    : "";
-                                  const date = createDateFromInputs(
-                                    year,
-                                    month,
-                                    day,
-                                  );
+                                value={member.name}
+                                onChange={(e) =>
                                   updateFamilyMember(
                                     member.id,
-                                    "birthDate",
-                                    date,
-                                  );
-                                }}
-                                min="1900"
-                                max="2100"
-                                className="text-center"
+                                    "name",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="이름"
+                                required
                               />
                             </div>
-                            <span className="text-muted-foreground">년</span>
-                            <div className="w-20">
-                              <Input
-                                type="number"
-                                placeholder="월"
-                                value={
-                                  member.birthDate
-                                    ? (
-                                        member.birthDate.getMonth() + 1
-                                      ).toString()
-                                    : ""
-                                }
-                                onChange={(e) => {
-                                  const year = member.birthDate
-                                    ? member.birthDate.getFullYear().toString()
-                                    : "";
-                                  const month = e.target.value;
-                                  const day = member.birthDate
-                                    ? member.birthDate.getDate().toString()
-                                    : "";
-                                  const date = createDateFromInputs(
-                                    year,
-                                    month,
-                                    day,
-                                  );
+                            <div className="space-y-2">
+                              <Label>
+                                관계 <span className="text-destructive">*</span>
+                              </Label>
+                              <Select
+                                value={member.relationship}
+                                onValueChange={(value) =>
                                   updateFamilyMember(
                                     member.id,
-                                    "birthDate",
-                                    date,
-                                  );
-                                }}
-                                min="1"
-                                max="12"
-                                className="text-center"
-                              />
-                            </div>
-                            <span className="text-muted-foreground">월</span>
-                            <div className="w-20">
-                              <Input
-                                type="number"
-                                placeholder="일"
-                                value={
-                                  member.birthDate
-                                    ? member.birthDate.getDate().toString()
-                                    : ""
+                                    "relationship",
+                                    value,
+                                  )
                                 }
-                                onChange={(e) => {
-                                  const year = member.birthDate
-                                    ? member.birthDate.getFullYear().toString()
-                                    : "";
-                                  const month = member.birthDate
-                                    ? (
-                                        member.birthDate.getMonth() + 1
-                                      ).toString()
-                                    : "";
-                                  const day = e.target.value;
-                                  const date = createDateFromInputs(
-                                    year,
-                                    month,
-                                    day,
-                                  );
-                                  updateFamilyMember(
-                                    member.id,
-                                    "birthDate",
-                                    date,
-                                  );
-                                }}
-                                min="1"
-                                max="31"
-                                className="text-center"
-                              />
+                                required
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="관계 선택" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="배우자">배우자</SelectItem>
+                                  <SelectItem value="자녀">자녀</SelectItem>
+                                  <SelectItem value="부모">부모</SelectItem>
+                                  <SelectItem value="형제자매">
+                                    형제자매
+                                  </SelectItem>
+                                  <SelectItem value="기타">기타</SelectItem>
+                                </SelectContent>
+                              </Select>
                             </div>
-                            <span className="text-muted-foreground">일</span>
+                            <div className="space-y-2 col-span-2">
+                              <Label>생년월일</Label>
+                              <div className="flex items-center gap-1">
+                                <div className="flex-1 min-w-[60px] max-w-[120px]">
+                                  <Input
+                                    type="number"
+                                    placeholder="년도 (예: 1990)"
+                                    value={
+                                      member.birthDate
+                                        ? member.birthDate
+                                            .getFullYear()
+                                            .toString()
+                                        : ""
+                                    }
+                                    onChange={(e) => {
+                                      const year = e.target.value;
+                                      const month = member.birthDate
+                                        ? (
+                                            member.birthDate.getMonth() + 1
+                                          ).toString()
+                                        : "";
+                                      const day = member.birthDate
+                                        ? member.birthDate.getDate().toString()
+                                        : "";
+                                      const date = createDateFromInputs(
+                                        year,
+                                        month,
+                                        day,
+                                      );
+                                      updateFamilyMember(
+                                        member.id,
+                                        "birthDate",
+                                        date,
+                                      );
+                                    }}
+                                    min="1900"
+                                    max="2100"
+                                    className="text-center text-sm md:text-base"
+                                  />
+                                </div>
+                                <div className="min-w-[56px] max-w-[80px] w-14 md:w-20">
+                                  <Input
+                                    type="number"
+                                    placeholder="월"
+                                    value={
+                                      member.birthDate
+                                        ? (
+                                            member.birthDate.getMonth() + 1
+                                          ).toString()
+                                        : ""
+                                    }
+                                    onChange={(e) => {
+                                      const year = member.birthDate
+                                        ? member.birthDate
+                                            .getFullYear()
+                                            .toString()
+                                        : "";
+                                      const month = e.target.value;
+                                      const day = member.birthDate
+                                        ? member.birthDate.getDate().toString()
+                                        : "";
+                                      const date = createDateFromInputs(
+                                        year,
+                                        month,
+                                        day,
+                                      );
+                                      updateFamilyMember(
+                                        member.id,
+                                        "birthDate",
+                                        date,
+                                      );
+                                    }}
+                                    min="1"
+                                    max="12"
+                                    className="text-center text-sm md:text-base w-full"
+                                  />
+                                </div>
+                                <div className="min-w-[56px] max-w-[80px] w-14 md:w-20">
+                                  <Input
+                                    type="number"
+                                    placeholder="일"
+                                    value={
+                                      member.birthDate
+                                        ? member.birthDate.getDate().toString()
+                                        : ""
+                                    }
+                                    onChange={(e) => {
+                                      const year = member.birthDate
+                                        ? member.birthDate
+                                            .getFullYear()
+                                            .toString()
+                                        : "";
+                                      const month = member.birthDate
+                                        ? (
+                                            member.birthDate.getMonth() + 1
+                                          ).toString()
+                                        : "";
+                                      const day = e.target.value;
+                                      const date = createDateFromInputs(
+                                        year,
+                                        month,
+                                        day,
+                                      );
+                                      updateFamilyMember(
+                                        member.id,
+                                        "birthDate",
+                                        date,
+                                      );
+                                    }}
+                                    min="1"
+                                    max="31"
+                                    className="text-center text-sm md:text-base w-full"
+                                  />
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>전화번호</Label>
-                          <Input
-                            value={member.phone}
-                            onChange={(e) =>
-                              updateFamilyMember(
-                                member.id,
-                                "phone",
-                                e.target.value,
-                              )
-                            }
-                            placeholder="010-1234-5678"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>이메일</Label>
-                          <div className="flex items-center gap-2">
+
+                          {/* 세 번째 줄: 전화번호와 이메일 */}
+                          <div className="grid grid-cols-4 gap-4">
+                            <div className="space-y-2">
+                              <Label>전화번호</Label>
+                              <Input
+                                value={member.phone}
+                                onChange={(e) =>
+                                  updateFamilyMember(
+                                    member.id,
+                                    "phone",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="010-1234-5678"
+                              />
+                            </div>
+                            <div className="space-y-2 col-span-3">
+                              <Label>이메일</Label>
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="email"
+                                  value={member.email}
+                                  onChange={(e) =>
+                                    updateFamilyMember(
+                                      member.id,
+                                      "email",
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="example@email.com"
+                                  className="flex-1"
+                                />
+                                {/* 배우자인 경우 권한 부여 버튼 표시 */}
+                                {member.relationship === "배우자" &&
+                                  member.email && (
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {(() => {
+                                        // 권한이 부여되었는지 확인
+                                        const isAuthorized =
+                                          member.authorizedClerkUserId &&
+                                          authorizations.has(
+                                            member.authorizedClerkUserId,
+                                          );
+
+                                        return isAuthorized ? (
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={() => {
+                                              if (
+                                                member.authorizedClerkUserId
+                                              ) {
+                                                handleRevokeAccess(
+                                                  member.authorizedClerkUserId,
+                                                );
+                                              }
+                                            }}
+                                            disabled={isLoadingAuth}
+                                            className="h-9 w-9"
+                                            title="권한 해제"
+                                          >
+                                            <UserX className="h-4 w-4" />
+                                          </Button>
+                                        ) : (
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={() =>
+                                              handleGrantSpouseAccess(member)
+                                            }
+                                            disabled={
+                                              isLoadingAuth || !member.email
+                                            }
+                                            className="h-9 w-9"
+                                            title="권한 부여"
+                                          >
+                                            <UserCheck className="h-4 w-4" />
+                                          </Button>
+                                        );
+                                      })()}
+                                    </div>
+                                  )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 네 번째 줄: 메모 */}
+                          <div className="space-y-2">
+                            <Label>메모</Label>
                             <Input
-                              type="email"
-                              value={member.email}
+                              value={member.notes}
                               onChange={(e) =>
                                 updateFamilyMember(
                                   member.id,
-                                  "email",
+                                  "notes",
                                   e.target.value,
                                 )
                               }
-                              placeholder="example@email.com"
-                              className="flex-1"
+                              placeholder="추가 정보 (선택사항)"
                             />
-                            {/* 배우자인 경우 권한 부여 버튼 표시 */}
-                            {member.relationship === "배우자" &&
-                              member.email && (
-                                <div className="flex items-center gap-1">
-                                  {(() => {
-                                    // 권한이 부여되었는지 확인
-                                    const isAuthorized =
-                                      member.authorizedClerkUserId &&
-                                      authorizations.has(
-                                        member.authorizedClerkUserId,
-                                      );
-
-                                    return isAuthorized ? (
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                          if (member.authorizedClerkUserId) {
-                                            handleRevokeAccess(
-                                              member.authorizedClerkUserId,
-                                            );
-                                          }
-                                        }}
-                                        disabled={isLoadingAuth}
-                                        className="text-xs"
-                                      >
-                                        <UserX className="h-3 w-3 mr-1" />
-                                        권한 해제
-                                      </Button>
-                                    ) : (
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() =>
-                                          handleGrantSpouseAccess(member)
-                                        }
-                                        disabled={
-                                          isLoadingAuth || !member.email
-                                        }
-                                        className="text-xs"
-                                      >
-                                        <UserCheck className="h-3 w-3 mr-1" />
-                                        권한 부여
-                                      </Button>
-                                    );
-                                  })()}
-                                </div>
-                              )}
                           </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>메모</Label>
-                          <Input
-                            value={member.notes}
-                            onChange={(e) =>
-                              updateFamilyMember(
-                                member.id,
-                                "notes",
-                                e.target.value,
-                              )
-                            }
-                            placeholder="추가 정보 (선택사항)"
-                          />
                         </div>
                       </CardContent>
                     </Card>
@@ -1164,97 +1185,108 @@ export default function ProfileTab({
                           </Button>
                         </div>
                       </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                          <Label>
-                            이름 <span className="text-destructive">*</span>
-                          </Label>
-                          <Input
-                            value={contact.name}
-                            onChange={(e) =>
-                              updateEmergencyContact(
-                                contact.id,
-                                "name",
-                                e.target.value,
-                              )
-                            }
-                            placeholder="이름"
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>
-                            관계 <span className="text-destructive">*</span>
-                          </Label>
-                          <Select
-                            value={contact.relationship}
-                            onValueChange={(value) =>
-                              updateEmergencyContact(
-                                contact.id,
-                                "relationship",
-                                value,
-                              )
-                            }
-                            required
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="관계 선택" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="가족">가족</SelectItem>
-                              <SelectItem value="친구">친구</SelectItem>
-                              <SelectItem value="지인">지인</SelectItem>
-                              <SelectItem value="동료">동료</SelectItem>
-                              <SelectItem value="기타">기타</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>
-                            전화번호(한국){" "}
-                            <span className="text-destructive">*</span>
-                          </Label>
-                          <Input
-                            value={contact.phoneKr}
-                            onChange={(e) =>
-                              updateEmergencyContact(
-                                contact.id,
-                                "phoneKr",
-                                e.target.value,
-                              )
-                            }
-                            placeholder="010-1234-5678"
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>이메일</Label>
-                          <Input
-                            type="email"
-                            value={contact.email}
-                            onChange={(e) =>
-                              updateEmergencyContact(
-                                contact.id,
-                                "email",
-                                e.target.value,
-                              )
-                            }
-                            placeholder="example@email.com"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>카카오ID</Label>
-                          <Input
-                            value={contact.kakaoId}
-                            onChange={(e) =>
-                              updateEmergencyContact(
-                                contact.id,
-                                "kakaoId",
-                                e.target.value,
-                              )
-                            }
-                            placeholder="카카오톡 ID (선택사항)"
-                          />
+                      <CardContent>
+                        <div className="space-y-6">
+                          {/* 첫 번째 줄: 이름과 관계 */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>
+                                이름 <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                value={contact.name}
+                                onChange={(e) =>
+                                  updateEmergencyContact(
+                                    contact.id,
+                                    "name",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="이름"
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>
+                                관계 <span className="text-destructive">*</span>
+                              </Label>
+                              <Select
+                                value={contact.relationship}
+                                onValueChange={(value) =>
+                                  updateEmergencyContact(
+                                    contact.id,
+                                    "relationship",
+                                    value,
+                                  )
+                                }
+                                required
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="관계 선택" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="가족">가족</SelectItem>
+                                  <SelectItem value="친구">친구</SelectItem>
+                                  <SelectItem value="지인">지인</SelectItem>
+                                  <SelectItem value="동료">동료</SelectItem>
+                                  <SelectItem value="기타">기타</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          {/* 두 번째 줄: 전화번호(한국)와 이메일 */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>
+                                전화번호(한국){" "}
+                                <span className="text-destructive">*</span>
+                              </Label>
+                              <Input
+                                value={contact.phoneKr}
+                                onChange={(e) =>
+                                  updateEmergencyContact(
+                                    contact.id,
+                                    "phoneKr",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="010-1234-5678"
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>이메일</Label>
+                              <Input
+                                type="email"
+                                value={contact.email}
+                                onChange={(e) =>
+                                  updateEmergencyContact(
+                                    contact.id,
+                                    "email",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="example@email.com"
+                              />
+                            </div>
+                          </div>
+
+                          {/* 세 번째 줄: 카카오ID */}
+                          <div className="space-y-2">
+                            <Label>카카오ID</Label>
+                            <Input
+                              value={contact.kakaoId}
+                              onChange={(e) =>
+                                updateEmergencyContact(
+                                  contact.id,
+                                  "kakaoId",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="카카오톡 ID (선택사항)"
+                            />
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
