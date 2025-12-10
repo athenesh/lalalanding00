@@ -109,7 +109,14 @@ export default clerkMiddleware(
     }
   },
   {
-    contentSecurityPolicy: {},
+    contentSecurityPolicy: {
+      directives: {
+        "connect-src": [
+          "https://*.supabase.co",
+          "wss://*.supabase.co",
+        ],
+      },
+    },
   },
 );
 
