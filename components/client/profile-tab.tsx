@@ -600,8 +600,8 @@ export default function ProfileTab({
         <CardContent>
           <div className="space-y-6">
             {/* 첫 번째 줄: 이름과 생년월일 */}
-            <div className="grid grid-cols-2 gap-2 md:gap-4 lg:gap-6">
-              <div className="space-y-2 min-w-0">
+            <div className="grid grid-cols-4 gap-2 md:gap-4 lg:gap-6">
+              <div className="space-y-2 min-w-0 col-span-1">
                 <Label htmlFor="name">
                   이름 <span className="text-destructive">*</span>
                 </Label>
@@ -616,48 +616,90 @@ export default function ProfileTab({
                 />
               </div>
 
-              <div className="space-y-2 min-w-0 overflow-hidden -mx-1 md:-mx-2 lg:mx-0">
+              <div className="space-y-2 min-w-0 overflow-hidden -mx-1 md:-mx-2 lg:mx-0 col-span-3">
                 <Label>생년월일</Label>
                 <div className="flex items-center gap-0.5 md:gap-1 min-w-0">
-                  <div className="flex-1 min-w-0 max-w-[110px] md:max-w-[120px] lg:max-w-[130px]">
+                  <div className="flex-1 min-w-0 max-w-[140px] md:max-w-[150px] lg:max-w-[160px]">
                     <Input
                       type="number"
                       placeholder="년도 (예: 1990)"
                       value={birthYear}
                       onChange={(e) => {
-                        const value = e.target.value;
+                        const value = e.target.value.replace(/[^0-9]/g, "");
                         setBirthYear(value);
                         handleBirthDateChange(value, birthMonth, birthDay);
+                      }}
+                      onKeyDown={(e) => {
+                        if (
+                          !/[0-9]/.test(e.key) &&
+                          ![
+                            "Backspace",
+                            "Delete",
+                            "ArrowLeft",
+                            "ArrowRight",
+                            "Tab",
+                          ].includes(e.key)
+                        ) {
+                          e.preventDefault();
+                        }
                       }}
                       min="1900"
                       max="2100"
                       className="text-center text-xs md:text-sm lg:text-base px-2 md:px-3"
                     />
                   </div>
-                  <div className="min-w-0 w-10 md:w-12 lg:w-16 flex-shrink-0">
+                  <div className="min-w-0 w-12 md:w-14 lg:w-16 flex-shrink-0">
                     <Input
                       type="number"
                       placeholder="월"
                       value={birthMonth}
                       onChange={(e) => {
-                        const value = e.target.value;
+                        const value = e.target.value.replace(/[^0-9]/g, "");
                         setBirthMonth(value);
                         handleBirthDateChange(birthYear, value, birthDay);
+                      }}
+                      onKeyDown={(e) => {
+                        if (
+                          !/[0-9]/.test(e.key) &&
+                          ![
+                            "Backspace",
+                            "Delete",
+                            "ArrowLeft",
+                            "ArrowRight",
+                            "Tab",
+                          ].includes(e.key)
+                        ) {
+                          e.preventDefault();
+                        }
                       }}
                       min="1"
                       max="12"
                       className="text-center text-xs md:text-sm lg:text-base w-full px-1 md:px-2 lg:px-3"
                     />
                   </div>
-                  <div className="min-w-0 w-10 md:w-12 lg:w-16 flex-shrink-0">
+                  <div className="min-w-0 w-12 md:w-14 lg:w-16 flex-shrink-0">
                     <Input
                       type="number"
                       placeholder="일"
                       value={birthDay}
                       onChange={(e) => {
-                        const value = e.target.value;
+                        const value = e.target.value.replace(/[^0-9]/g, "");
                         setBirthDay(value);
                         handleBirthDateChange(birthYear, birthMonth, value);
+                      }}
+                      onKeyDown={(e) => {
+                        if (
+                          !/[0-9]/.test(e.key) &&
+                          ![
+                            "Backspace",
+                            "Delete",
+                            "ArrowLeft",
+                            "ArrowRight",
+                            "Tab",
+                          ].includes(e.key)
+                        ) {
+                          e.preventDefault();
+                        }
                       }}
                       min="1"
                       max="31"
@@ -668,40 +710,8 @@ export default function ProfileTab({
               </div>
             </div>
 
-            {/* 두 번째 줄: 이메일과 전화번호 */}
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="email">
-                  이메일 <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  placeholder="example@email.com"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">전화번호</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
-                  placeholder="010-1234-5678"
-                />
-              </div>
-            </div>
-
-            {/* 세 번째 줄: 직업, 이주 목적, 이주 예정일 */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 lg:gap-6">
+            {/* 두 번째 줄: 직업과 이메일 */}
+            <div className="grid grid-cols-2 gap-2 md:gap-4 lg:gap-6">
               <div className="space-y-2">
                 <Label htmlFor="occupation">
                   직업 <span className="text-destructive">*</span>
@@ -725,6 +735,25 @@ export default function ProfileTab({
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="email">
+                  이메일 <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                  placeholder="example@email.com"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* 세 번째 줄: 이주 목적과 전화번호 */}
+            <div className="grid grid-cols-2 gap-2 md:gap-4 lg:gap-6">
+              <div className="space-y-2">
                 <Label htmlFor="relocationType">
                   이주 목적 <span className="text-destructive">*</span>
                 </Label>
@@ -746,56 +775,70 @@ export default function ProfileTab({
                 </Select>
               </div>
 
-              <div className="space-y-2 col-span-2 lg:col-span-2">
-                <Label>
-                  이주 예정일 <span className="text-destructive">*</span>
-                </Label>
-                <div className="flex items-center gap-1">
-                  <div className="flex-1 min-w-[60px] max-w-[120px]">
-                    <Input
-                      type="number"
-                      placeholder="년도 (예: 2025)"
-                      value={movingYear}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setMovingYear(value);
-                        handleMovingDateChange(value, movingMonth, movingDay);
-                      }}
-                      min="1900"
-                      max="2100"
-                      className="text-center text-sm md:text-base"
-                    />
-                  </div>
-                  <div className="min-w-[56px] max-w-[80px] w-14 md:w-20">
-                    <Input
-                      type="number"
-                      placeholder="월"
-                      value={movingMonth}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setMovingMonth(value);
-                        handleMovingDateChange(movingYear, value, movingDay);
-                      }}
-                      min="1"
-                      max="12"
-                      className="text-center text-sm md:text-base w-full"
-                    />
-                  </div>
-                  <div className="min-w-[56px] max-w-[80px] w-14 md:w-20">
-                    <Input
-                      type="number"
-                      placeholder="일"
-                      value={movingDay}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setMovingDay(value);
-                        handleMovingDateChange(movingYear, movingMonth, value);
-                      }}
-                      min="1"
-                      max="31"
-                      className="text-center text-sm md:text-base w-full"
-                    />
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">전화번호</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
+                  placeholder="010-1234-5678"
+                />
+              </div>
+            </div>
+
+            {/* 네 번째 줄: 이주 예정일 */}
+            <div className="space-y-2">
+              <Label>
+                이주 예정일 <span className="text-destructive">*</span>
+              </Label>
+              <div className="flex items-center gap-1">
+                <div className="flex-1 min-w-[60px] max-w-[120px]">
+                  <Input
+                    type="number"
+                    placeholder="년도 (예: 2025)"
+                    value={movingYear}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setMovingYear(value);
+                      handleMovingDateChange(value, movingMonth, movingDay);
+                    }}
+                    min="1900"
+                    max="2100"
+                    className="text-center text-sm md:text-base"
+                  />
+                </div>
+                <div className="min-w-[56px] max-w-[80px] w-14 md:w-20">
+                  <Input
+                    type="number"
+                    placeholder="월"
+                    value={movingMonth}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setMovingMonth(value);
+                      handleMovingDateChange(movingYear, value, movingDay);
+                    }}
+                    min="1"
+                    max="12"
+                    className="text-center text-sm md:text-base w-full"
+                  />
+                </div>
+                <div className="min-w-[56px] max-w-[80px] w-14 md:w-20">
+                  <Input
+                    type="number"
+                    placeholder="일"
+                    value={movingDay}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setMovingDay(value);
+                      handleMovingDateChange(movingYear, movingMonth, value);
+                    }}
+                    min="1"
+                    max="31"
+                    className="text-center text-sm md:text-base w-full"
+                  />
                 </div>
               </div>
             </div>
@@ -902,7 +945,10 @@ export default function ProfileTab({
                                         : ""
                                     }
                                     onChange={(e) => {
-                                      const year = e.target.value;
+                                      const year = e.target.value.replace(
+                                        /[^0-9]/g,
+                                        "",
+                                      );
                                       const month = member.birthDate
                                         ? (
                                             member.birthDate.getMonth() + 1
@@ -921,6 +967,20 @@ export default function ProfileTab({
                                         "birthDate",
                                         date,
                                       );
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (
+                                        !/[0-9]/.test(e.key) &&
+                                        ![
+                                          "Backspace",
+                                          "Delete",
+                                          "ArrowLeft",
+                                          "ArrowRight",
+                                          "Tab",
+                                        ].includes(e.key)
+                                      ) {
+                                        e.preventDefault();
+                                      }
                                     }}
                                     min="1900"
                                     max="2100"
@@ -944,7 +1004,10 @@ export default function ProfileTab({
                                             .getFullYear()
                                             .toString()
                                         : "";
-                                      const month = e.target.value;
+                                      const month = e.target.value.replace(
+                                        /[^0-9]/g,
+                                        "",
+                                      );
                                       const day = member.birthDate
                                         ? member.birthDate.getDate().toString()
                                         : "";
@@ -958,6 +1021,20 @@ export default function ProfileTab({
                                         "birthDate",
                                         date,
                                       );
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (
+                                        !/[0-9]/.test(e.key) &&
+                                        ![
+                                          "Backspace",
+                                          "Delete",
+                                          "ArrowLeft",
+                                          "ArrowRight",
+                                          "Tab",
+                                        ].includes(e.key)
+                                      ) {
+                                        e.preventDefault();
+                                      }
                                     }}
                                     min="1"
                                     max="12"
@@ -984,7 +1061,10 @@ export default function ProfileTab({
                                             member.birthDate.getMonth() + 1
                                           ).toString()
                                         : "";
-                                      const day = e.target.value;
+                                      const day = e.target.value.replace(
+                                        /[^0-9]/g,
+                                        "",
+                                      );
                                       const date = createDateFromInputs(
                                         year,
                                         month,
@@ -995,6 +1075,20 @@ export default function ProfileTab({
                                         "birthDate",
                                         date,
                                       );
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (
+                                        !/[0-9]/.test(e.key) &&
+                                        ![
+                                          "Backspace",
+                                          "Delete",
+                                          "ArrowLeft",
+                                          "ArrowRight",
+                                          "Tab",
+                                        ].includes(e.key)
+                                      ) {
+                                        e.preventDefault();
+                                      }
                                     }}
                                     min="1"
                                     max="31"
