@@ -616,10 +616,10 @@ export default function ProfileTab({
                 />
               </div>
 
-              <div className="space-y-2 min-w-0 overflow-hidden">
+              <div className="space-y-2 min-w-0 overflow-hidden -mx-1 md:-mx-2 lg:mx-0">
                 <Label>생년월일</Label>
                 <div className="flex items-center gap-0.5 md:gap-1 min-w-0">
-                  <div className="flex-1 min-w-0 max-w-[90px] md:max-w-[100px]">
+                  <div className="flex-1 min-w-0 max-w-[110px] md:max-w-[120px] lg:max-w-[130px]">
                     <Input
                       type="number"
                       placeholder="년도 (예: 1990)"
@@ -631,7 +631,7 @@ export default function ProfileTab({
                       }}
                       min="1900"
                       max="2100"
-                      className="text-center text-xs md:text-sm lg:text-base px-1 md:px-2 lg:px-3"
+                      className="text-center text-xs md:text-sm lg:text-base px-2 md:px-3"
                     />
                   </div>
                   <div className="min-w-0 w-10 md:w-12 lg:w-16 flex-shrink-0">
