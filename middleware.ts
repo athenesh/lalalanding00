@@ -114,6 +114,22 @@ export default clerkMiddleware(
         "connect-src": [
           "https://*.supabase.co",
           "wss://*.supabase.co",
+          // Vercel Live (개발 환경 전용)
+          ...(process.env.NODE_ENV === "development"
+            ? ["https://vercel.live"]
+            : []),
+        ],
+        "frame-src": [
+          // Vercel Live (개발 환경 전용)
+          ...(process.env.NODE_ENV === "development"
+            ? ["https://vercel.live"]
+            : []),
+        ],
+        "script-src": [
+          // Vercel Live (개발 환경 전용)
+          ...(process.env.NODE_ENV === "development"
+            ? ["https://vercel.live"]
+            : []),
         ],
       },
     },

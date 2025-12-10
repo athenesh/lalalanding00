@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  getAuthUserId,
-  getClientIdForUser,
-  requireClientOrAuthorized,
-} from "@/lib/auth";
+import { getAuthUserId, getClientIdForUser } from "@/lib/auth";
 import { createClerkSupabaseClient } from "@/lib/supabase/server";
 import { updateClientProfileSchema } from "@/lib/validations/api-schemas";
 
@@ -16,16 +12,14 @@ export async function GET() {
   try {
     console.log("[API] GET /api/client/profile 호출");
 
-    // 클라이언트 또는 권한 부여된 사용자 확인
-    await requireClientOrAuthorized();
-
     const supabase = createClerkSupabaseClient();
 
     // 클라이언트 본인 또는 권한 부여된 사용자의 client_id 조회
     const clientId = await getClientIdForUser();
 
     if (!clientId) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      console.log("[API] 클라이언트 또는 권한 부여된 사용자가 아님");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // 사용자 ID 조회 (로깅용)
@@ -112,16 +106,14 @@ export async function PATCH(request: Request) {
   try {
     console.log("[API] PATCH /api/client/profile 호출");
 
-    // 클라이언트 또는 권한 부여된 사용자 확인
-    await requireClientOrAuthorized();
-
     const supabase = createClerkSupabaseClient();
 
     // 클라이언트 본인 또는 권한 부여된 사용자의 client_id 조회
     const clientId = await getClientIdForUser();
 
     if (!clientId) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+      console.log("[API] 클라이언트 또는 권한 부여된 사용자가 아님");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // 사용자 ID 조회 (로깅용)
