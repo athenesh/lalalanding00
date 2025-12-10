@@ -386,9 +386,111 @@ WITH CHECK (
 
 - `fix_agent_storage_access.sql`: Storage RLS 정책 업데이트 SQL 파일
 
+### 10. Clerk CSP 위반 및 도메인 제한 오류
+
+#### 10.1. CSP 위반: "Loading the script 'https://clerk.lalalanding.net/...' violates the following Content Security Policy directive"
+
+**원인**: Clerk 프록시 도메인(`clerk.lalalanding.net`)이 CSP(Content Security Policy)에 허용되지 않아 스크립트 로드가 차단되었습니다.
+
+**에러 메시지**:
+```
+Loading the script 'https://clerk.lalalanding.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js' violates the following Content Security Policy directive: "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.clerk.com https://*.clerk.accounts.dev"
+```
+
+**해결 방법**:
+
+`next.config.ts`의 CSP 설정에 `clerk.lalalanding.net` 도메인을 추가:
+
+```typescript
+{
+  key: "Content-Security-Policy",
+  value: [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.clerk.com https://*.clerk.accounts.dev https://clerk.lalalanding.net",
+    "connect-src 'self' https://*.clerk.com https://*.clerk.accounts.dev https://clerk.lalalanding.net https://*.supabase.co wss://*.supabase.co",
+    "frame-src 'self' https://*.clerk.com https://*.clerk.accounts.dev https://clerk.lalalanding.net",
+    // ... 나머지 설정
+  ].join("; "),
+}
+```
+
+**적용된 변경사항**:
+
+- `next.config.ts`: CSP의 `script-src`, `connect-src`, `frame-src`에 `https://clerk.lalalanding.net` 추가
+
+#### 10.2. Clerk 프로덕션 키 도메인 제한 오류: "Production Keys are only allowed for domain 'lalalanding.net'"
+
+**원인**: Clerk 프로덕션 키가 `lalalanding.net` 도메인에만 허용되어 있어, 로컬 개발 환경(`localhost:3000`)에서 사용할 수 없습니다.
+
+**에러 메시지**:
+```
+Clerk: Production Keys are only allowed for domain "lalalanding.net". 
+API Error: The Request HTTP Origin header must be equal to or a subdomain of the requesting URL.
+```
+
+**상세 분석**:
+
+1. Clerk 프로덕션 키는 보안을 위해 특정 도메인에만 사용 가능하도록 제한됨
+2. 개발 환경에서 `localhost:3000`으로 접근 시 도메인 불일치로 인증 실패
+3. Clerk API 호출 시 `400 Bad Request` 오류 발생
+
+**해결 방법**:
+
+**방법 1: Clerk 대시보드에서 개발 도메인 추가 (권장)**
+
+1. [Clerk Dashboard](https://dashboard.clerk.com) 접속
+2. 프로젝트 선택
+3. **Settings** → **Domains** 메뉴로 이동
+4. **Allowed origins** 섹션에 다음 추가:
+   - `http://localhost:3000`
+   - `http://127.0.0.1:3000` (선택사항)
+5. **Save** 클릭
+
+이 방법을 사용하면 프로덕션 키를 로컬 개발 환경에서도 사용할 수 있습니다.
+
+**방법 2: 개발용 Clerk 프로젝트 생성 (대안)**
+
+1. Clerk Dashboard에서 개발 전용 프로젝트 생성
+2. 개발 프로젝트의 키를 `.env.local`에 설정
+3. 프로덕션 키는 `.env.production`에 설정
+
+**방법 3: 환경 변수로 개발/프로덕션 분리**
+
+```typescript
+// app/layout.tsx
+const publishableKey = process.env.NODE_ENV === 'production'
+  ? process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY_PROD
+  : process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY_DEV;
+
+<ClerkProvider publishableKey={publishableKey} ...>
+```
+
+**권장 해결 방법**:
+
+- **개발 중**: 방법 1 (Clerk 대시보드에서 `localhost` 허용) - 가장 간단하고 빠름
+- **프로덕션 준비**: 방법 2 (개발/프로덕션 프로젝트 분리) - 보안상 더 안전
+
+**해결 결과**:
+
+- ✅ CSP 위반 오류 해결됨
+- ✅ Clerk 스크립트가 정상적으로 로드됨
+- ✅ `localhost:3000`에서 Clerk 인증이 정상 작동함
+
+**주의사항**:
+
+- 프로덕션 환경에서는 반드시 프로덕션 도메인만 허용하도록 설정
+- 개발 도메인(`localhost`)은 개발 환경에서만 사용
+- CSP 설정은 보안에 중요하므로 신중하게 관리
+
+**참고 파일**:
+
+- `next.config.ts`: CSP 설정 파일
+
 ## 참고 자료
 
 - [Supabase Clerk 통합 가이드](https://supabase.com/docs/guides/auth/third-party/clerk)
 - [Supabase Storage 가이드](https://supabase.com/docs/guides/storage)
 - [Supabase Storage RLS 가이드](https://supabase.com/docs/guides/storage/security/access-control)
 - [Clerk 세션 토큰 커스터마이징](https://clerk.com/docs/backend-requests/custom-session-token)
+- [Clerk 도메인 설정](https://clerk.com/docs/authentication/domains)
+- [Next.js Content Security Policy](https://nextjs.org/docs/app/api-reference/next-config-js/headers)
