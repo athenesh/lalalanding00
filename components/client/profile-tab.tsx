@@ -600,8 +600,8 @@ export default function ProfileTab({
         <CardContent>
           <div className="space-y-6">
             {/* 첫 번째 줄: 이름과 생년월일 */}
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2 md:gap-4 lg:gap-6">
+              <div className="space-y-2 min-w-0">
                 <Label htmlFor="name">
                   이름 <span className="text-destructive">*</span>
                 </Label>
@@ -616,10 +616,10 @@ export default function ProfileTab({
                 />
               </div>
 
-              <div className="space-y-2 min-w-0">
+              <div className="space-y-2 min-w-0 overflow-hidden">
                 <Label>생년월일</Label>
-                <div className="flex items-center gap-1 min-w-0">
-                  <div className="flex-1 min-w-0 max-w-[100px]">
+                <div className="flex items-center gap-0.5 md:gap-1 min-w-0">
+                  <div className="flex-1 min-w-0 max-w-[90px] md:max-w-[100px]">
                     <Input
                       type="number"
                       placeholder="년도 (예: 1990)"
@@ -631,10 +631,10 @@ export default function ProfileTab({
                       }}
                       min="1900"
                       max="2100"
-                      className="text-center text-sm md:text-base"
+                      className="text-center text-xs md:text-sm lg:text-base px-1 md:px-2 lg:px-3"
                     />
                   </div>
-                  <div className="min-w-0 w-12 md:w-16 flex-shrink-0">
+                  <div className="min-w-0 w-10 md:w-12 lg:w-16 flex-shrink-0">
                     <Input
                       type="number"
                       placeholder="월"
@@ -646,10 +646,10 @@ export default function ProfileTab({
                       }}
                       min="1"
                       max="12"
-                      className="text-center text-sm md:text-base w-full"
+                      className="text-center text-xs md:text-sm lg:text-base w-full px-1 md:px-2 lg:px-3"
                     />
                   </div>
-                  <div className="min-w-0 w-12 md:w-16 flex-shrink-0">
+                  <div className="min-w-0 w-10 md:w-12 lg:w-16 flex-shrink-0">
                     <Input
                       type="number"
                       placeholder="일"
@@ -661,7 +661,7 @@ export default function ProfileTab({
                       }}
                       min="1"
                       max="31"
-                      className="text-center text-sm md:text-base w-full"
+                      className="text-center text-xs md:text-sm lg:text-base w-full px-1 md:px-2 lg:px-3"
                     />
                   </div>
                 </div>
