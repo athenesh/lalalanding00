@@ -334,6 +334,14 @@ export default function ClientHomePage() {
         itemCount: items.length,
       });
 
+      // 저장할 때 전송한 메모를 저장해두고, 서버 응답과 비교하여 동기화
+      const sentMemos = new Map(
+        items.map((item: any) => [
+          item.templateId,
+          item.memo || "", // 전송한 메모 저장
+        ])
+      );
+
       // ChecklistItem을 DB 업데이트 형식으로 변환
       // 템플릿 기준 로직: templateId를 기준으로 상태만 저장
       // updateChecklistSchema에 맞는 필드명 사용 (snake_case)
@@ -387,6 +395,7 @@ export default function ClientHomePage() {
       const { updated } = await response.json();
 
       // 서버 응답 데이터로 로컬 상태만 부분 업데이트 (재렌더링 최소화)
+      // 단, 현재 입력 중인 메모는 보존 (무한 루프 방지)
       if (updated && updated.length > 0) {
         setChecklistData((prevChecklist) => {
           const updatedMap = new Map(
@@ -397,11 +406,26 @@ export default function ClientHomePage() {
             const serverItem = updatedMap.get(item.templateId) as any;
             if (serverItem) {
               // 서버에서 받은 데이터로 부분 업데이트
+              const serverMemo = serverItem.notes !== null && serverItem.notes !== undefined 
+                ? serverItem.notes 
+                : "";
+              
+              // 저장할 때 전송한 메모와 서버 응답 메모 비교
+              const sentMemo = sentMemos.get(item.templateId) || "";
+              
+              // 전송한 메모와 서버 응답 메모가 같으면 서버 메모 사용 (정상 동기화)
+              // 다르면 현재 로컬 메모 유지 (사용자가 입력 중일 수 있음)
+              // 또는 전송한 메모와 현재 로컬 메모가 다르면 현재 로컬 메모 유지 (새로 입력 중)
+              const finalMemo = 
+                sentMemo === serverMemo && item.memo === sentMemo
+                  ? serverMemo // 정상 동기화: 전송=서버=로컬
+                  : item.memo; // 사용자가 입력 중: 현재 로컬 메모 유지
+              
               return {
                 ...item,
                 id: serverItem.id || item.id, // 새로 생성된 경우 id 업데이트
                 isCompleted: serverItem.is_completed ?? item.isCompleted,
-                memo: serverItem.notes || item.memo || "",
+                memo: finalMemo,
                 completedAt: serverItem.completed_at
                   ? new Date(serverItem.completed_at)
                   : item.completedAt,

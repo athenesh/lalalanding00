@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChecklistItem, TimelinePhase, ChecklistFile } from "@/types/checklist";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChecklistTabProps {
   movingDate?: string; // 클라이언트의 이주 날짜
@@ -53,6 +54,7 @@ const ChecklistRow = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const memoDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const { toast } = useToast();
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0]) return;
@@ -166,9 +168,10 @@ const ChecklistRow = ({
 
     // 낙관적 업데이트: 즉시 UI에서 제거
     const updatedFiles = item.files.filter((f) => f.id !== fileId);
+    // 파일 삭제는 이미 API를 통해 완료되므로 로컬 상태만 업데이트 (shouldSave: false)
     onUpdateItem(itemId, {
       files: updatedFiles,
-    });
+    }, false); // shouldSave: false - 파일 삭제는 별도 API로 처리되므로 체크리스트 저장 불필요
 
     // 임시 파일이면 서버 삭제 불필요
     if (fileId.startsWith("temp-")) {
@@ -194,6 +197,10 @@ const ChecklistRow = ({
             "[checklist-tab] 파일 경로를 추출할 수 없습니다:",
             file.file_url,
           );
+          // 파일 경로 추출 실패 시 UI에서 파일 다시 추가
+          onUpdateItem(itemId, {
+            files: [...updatedFiles, file],
+          }, false);
           return;
         }
 
@@ -212,13 +219,19 @@ const ChecklistRow = ({
         }
 
         console.log("[checklist-tab] 파일 삭제 성공:", file.document_id);
+        
+        // 성공 메시지 표시
+        toast({
+          title: "파일 삭제 완료",
+          description: `${file.name} 파일이 삭제되었습니다.`,
+        });
       } catch (error) {
         console.error("[checklist-tab] 파일 삭제 실패:", error);
 
-        // 에러 발생 시 파일 다시 추가
+        // 에러 발생 시 파일 다시 추가 (로컬 상태만 업데이트)
         onUpdateItem(itemId, {
           files: [...updatedFiles, file],
-        });
+        }, false); // shouldSave: false
 
         alert(
           `파일 삭제 실패: ${
@@ -499,14 +512,40 @@ export default function ChecklistTab({
   );
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false); // 저장 중 상태 추가
+  const [isInitialized, setIsInitialized] = useState(false); // 초기화 여부
 
   // initialData가 변경되면 checklist 상태 업데이트
+  // 단, 저장 중이 아닐 때만 업데이트 (무한 루프 방지)
   useEffect(() => {
-    if (initialData !== undefined) {
-      // initialData가 로드되었을 때 (빈 배열 포함)
-      setChecklist(initialData);
+    if (initialData !== undefined && !isSaving) {
+      // 초기 로드 시에만 전체 덮어쓰기
+      if (!isInitialized) {
+        setChecklist(initialData);
+        setIsInitialized(true);
+      } else {
+        // 이후에는 서버 응답과 로컬 상태를 병합 (편집 중인 메모 보호)
+        setChecklist((prevChecklist) => {
+          const updatedMap = new Map(
+            initialData.map((item) => [item.templateId, item])
+          );
+
+          return prevChecklist.map((prevItem) => {
+            const serverItem = updatedMap.get(prevItem.templateId);
+            if (serverItem) {
+              // 서버에서 받은 데이터로 업데이트하되, 메모는 현재 입력 중인 값 우선
+              // (서버 응답이 현재 입력과 다를 수 있으므로)
+              return {
+                ...serverItem,
+                // 메모는 현재 로컬 상태 유지 (사용자가 입력 중일 수 있음)
+                memo: prevItem.memo !== undefined ? prevItem.memo : serverItem.memo || "",
+              };
+            }
+            return prevItem;
+          });
+        });
+      }
     }
-  }, [initialData]);
+  }, [initialData, isSaving, isInitialized]);
 
   // Auto expand first uncompleted item of active phase
   useEffect(() => {
@@ -534,7 +573,8 @@ export default function ChecklistTab({
     setChecklist(updatedChecklist);
 
     // Supabase 연동 모드이고 onSave가 있고 shouldSave가 true면 저장
-    if (onSave && shouldSave) {
+    // 단, 이미 저장 중이면 무시 (무한 루프 방지)
+    if (onSave && shouldSave && !isSaving) {
       try {
         setIsSaving(true);
         await onSave(updatedChecklist);
