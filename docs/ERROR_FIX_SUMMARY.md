@@ -393,6 +393,7 @@ WITH CHECK (
 **원인**: Clerk 프록시 도메인(`clerk.lalalanding.net`)이 CSP(Content Security Policy)에 허용되지 않아 스크립트 로드가 차단되었습니다.
 
 **에러 메시지**:
+
 ```
 Loading the script 'https://clerk.lalalanding.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js' violates the following Content Security Policy directive: "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.clerk.com https://*.clerk.accounts.dev"
 ```
@@ -423,8 +424,9 @@ Loading the script 'https://clerk.lalalanding.net/npm/@clerk/clerk-js@5/dist/cle
 **원인**: Clerk 프로덕션 키가 `lalalanding.net` 도메인에만 허용되어 있어, 로컬 개발 환경(`localhost:3000`)에서 사용할 수 없습니다.
 
 **에러 메시지**:
+
 ```
-Clerk: Production Keys are only allowed for domain "lalalanding.net". 
+Clerk: Production Keys are only allowed for domain "lalalanding.net".
 API Error: The Request HTTP Origin header must be equal to or a subdomain of the requesting URL.
 ```
 
@@ -485,6 +487,147 @@ const publishableKey = process.env.NODE_ENV === 'production'
 **참고 파일**:
 
 - `next.config.ts`: CSP 설정 파일
+
+### 11. API 라우트에서 NEXT_REDIRECT 에러 및 401 Unauthorized 에러
+
+#### 11.1. API 라우트에서 500 Internal Server Error 발생
+
+**원인**: API 라우트에서 `requireClientOrAuthorized()` 함수를 사용했는데, 이 함수가 내부적으로 `redirect("/")`를 호출하여 `NEXT_REDIRECT` 에러가 발생했습니다.
+
+**에러 메시지**:
+
+```
+[API] Error in GET /api/client/checklist: {
+  error: Error: NEXT_REDIRECT
+      at g (.next/server/chunks/5706.js:14:2270)
+      ...
+  digest: 'NEXT_REDIRECT;replace;/;307;'
+}
+```
+
+**상세 분석**:
+
+1. **인증 체크 함수의 리다이렉트 문제**:
+
+   - `requireClientOrAuthorized()` 함수가 `getClientIdForUser()`를 호출
+   - `getClientIdForUser()`가 `getAuthUserId()`를 호출
+   - `getAuthUserId()`는 인증되지 않은 경우 `redirect("/sign-in")` 호출
+   - API 라우트에서는 리다이렉트가 제대로 작동하지 않아 500 에러 발생
+
+2. **클라이언트 레코드 부재**:
+   - `clients` 테이블에 해당 사용자의 레코드가 없어서 `getClientIdForUser()`가 `null` 반환
+   - 이로 인해 401 Unauthorized 에러 발생
+
+**해결 방법**:
+
+1. **API 라우트에서 직접 인증 체크**:
+
+   - `requireClientOrAuthorized()` 제거
+   - `auth()` 함수를 직접 호출하여 리다이렉트 없이 인증 확인
+   - `getClientIdForUser(userId)`에 `userId`를 직접 전달
+
+2. **인증 함수 수정**:
+
+   - `getClientIdForUser()` 함수에 `userId` 파라미터 추가 (선택사항)
+   - `userId`가 제공되면 직접 사용, 없으면 `getAuthUserId()` 호출
+   - `getAuthorizedClientId()` 함수도 동일하게 수정
+
+3. **클라이언트 레코드 자동 생성**:
+   - 브라우저 콘솔에서 `/api/clients/auto-create` API 호출하여 레코드 생성
+   - 또는 회원가입 완료 페이지에서 자동 생성되도록 보장
+
+**적용된 변경사항**:
+
+### 11. `lib/auth.ts`
+
+- `getClientIdForUser(userId?: string)`: `userId` 파라미터 추가 (API 라우트용)
+- `getAuthorizedClientId(userId?: string)`: `userId` 파라미터 추가
+- 디버깅 로그 추가: 클라이언트 조회 과정 추적
+
+### 12. `app/api/client/profile/route.ts`
+
+- `requireClientOrAuthorized()` 제거
+- `auth()` 직접 호출하여 인증 확인
+- `getClientIdForUser(userId)`에 `userId` 전달
+
+### 13. `app/api/client/checklist/route.ts`
+
+- `requireClientOrAuthorized()` 제거
+- `auth()` 직접 호출하여 인증 확인
+- `getClientIdForUser(userId)`에 `userId` 전달
+
+### 14. `app/api/client/housing/route.ts`
+
+- `requireClientOrAuthorized()` 제거
+- `auth()` 직접 호출하여 인증 확인
+- `getClientIdForUser(userId)`에 `userId` 전달
+
+### 15. `app/api/clients/auto-create/route.ts`
+
+- `requireClient()` 제거
+- `auth()` 직접 호출하여 인증 확인
+- `getAuthRole()`로 역할 확인
+
+**코드 예시**:
+
+```typescript
+// ❌ 잘못된 방법 (API 라우트에서 리다이렉트 발생)
+export async function GET() {
+  await requireClientOrAuthorized(); // redirect() 호출로 500 에러
+  const clientId = await getClientIdForUser();
+  // ...
+}
+
+// ✅ 올바른 방법 (리다이렉트 없이 에러 응답)
+export async function GET() {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const clientId = await getClientIdForUser(userId);
+  if (!clientId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  // ...
+}
+```
+
+**해결 결과**:
+
+- ✅ API 라우트에서 500 에러 대신 401 에러 반환
+- ✅ `NEXT_REDIRECT` 에러 해결
+- ✅ 인증 실패 시 적절한 HTTP 상태 코드 반환
+- ✅ 디버깅 로그 추가로 문제 추적 용이
+
+**주의사항**:
+
+- API 라우트에서는 절대 `redirect()` 함수를 사용하지 마세요
+- 인증 실패 시 `NextResponse.json()`으로 에러 응답 반환
+- 페이지 컴포넌트에서는 `requireClientOrAuthorized()` 사용 가능 (리다이렉트 필요)
+
+**임시 해결 방법**:
+
+클라이언트 레코드가 없는 경우, 브라우저 콘솔에서 다음 코드 실행:
+
+```javascript
+fetch("/api/clients/auto-create", { method: "POST" })
+  .then((res) => res.json())
+  .then((data) => {
+    if (data.success) {
+      alert("클라이언트 레코드 생성 완료! 페이지를 새로고침하세요.");
+      location.reload();
+    }
+  });
+```
+
+**참고 파일**:
+
+- `lib/auth.ts`: 인증 함수들
+- `app/api/client/profile/route.ts`: 프로필 API 라우트
+- `app/api/client/checklist/route.ts`: 체크리스트 API 라우트
+- `app/api/client/housing/route.ts`: 주거옵션 API 라우트
+- `app/api/clients/auto-create/route.ts`: 클라이언트 자동 생성 API 라우트
 
 ## 참고 자료
 

@@ -167,6 +167,9 @@ export async function getClientIdForUser(
 
   // 1. 권한 부여된 사용자인지 먼저 확인 (우선순위)
   // 배우자는 항상 권한을 받은 클라이언트의 데이터를 봐야 함
+  console.log("[Auth] 권한 부여된 클라이언트 확인 시작:", {
+    userId: finalUserId,
+  });
   const authorizedClientId = await getAuthorizedClientIdForUser(finalUserId);
   if (authorizedClientId) {
     console.log("[Auth] 권한 부여된 클라이언트 우선 반환:", {
@@ -175,8 +178,14 @@ export async function getClientIdForUser(
     });
     return authorizedClientId;
   }
+  console.log("[Auth] 권한 부여된 클라이언트 없음:", {
+    userId: finalUserId,
+  });
 
   // 2. 본인이 클라이언트인지 확인
+  console.log("[Auth] 본인 클라이언트 조회 시작:", {
+    userId: finalUserId,
+  });
   const { data: ownClient, error: ownClientError } = await supabase
     .from("clients")
     .select("id")
@@ -191,7 +200,24 @@ export async function getClientIdForUser(
     return ownClient.id;
   }
 
+  // 에러가 있으면 로그 출력
+  if (ownClientError) {
+    console.log("[Auth] 클라이언트 조회 에러:", {
+      userId: finalUserId,
+      error: ownClientError,
+      errorCode: ownClientError.code,
+      errorMessage: ownClientError.message,
+    });
+  } else {
+    console.log("[Auth] 클라이언트 레코드를 찾을 수 없음:", {
+      userId: finalUserId,
+    });
+  }
+
   // 둘 다 없으면 null 반환
+  console.log("[Auth] 클라이언트 ID를 찾을 수 없어 null 반환:", {
+    userId: finalUserId,
+  });
   return null;
 }
 

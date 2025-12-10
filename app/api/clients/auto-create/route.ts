@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getAuthUserId, requireClient } from "@/lib/auth";
+import { auth } from "@clerk/nextjs/server";
+import { getAuthRole } from "@/lib/auth";
 import { createClerkSupabaseClient } from "@/lib/supabase/server";
 import { clerkClient } from "@clerk/nextjs/server";
 
@@ -13,10 +14,23 @@ export async function POST() {
     // API 호출 시작 로그
     console.log("[API] POST /api/clients/auto-create 호출 시작");
 
-    // 클라이언트 권한 확인
-    await requireClient();
+    // 인증 확인 (리다이렉트 없이)
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
 
-    const userId = await getAuthUserId();
+    // 클라이언트 역할 확인
+    const role = await getAuthRole();
+    if (role !== "client") {
+      return NextResponse.json(
+        { error: "Only clients can create client records" },
+        { status: 403 }
+      );
+    }
     const supabase = createClerkSupabaseClient();
 
     // Clerk에서 사용자 정보 가져오기

@@ -701,7 +701,7 @@ export default function ProfileTab({
             </div>
 
             {/* 세 번째 줄: 직업, 이주 목적, 이주 예정일 */}
-            <div className="grid grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="occupation">
                   직업 <span className="text-destructive">*</span>
@@ -713,7 +713,7 @@ export default function ProfileTab({
                   }
                   required
                 >
-                  <SelectTrigger id="occupation">
+                  <SelectTrigger id="occupation" className="w-full">
                     <SelectValue placeholder="직업을 선택하세요" />
                   </SelectTrigger>
                   <SelectContent>
@@ -735,7 +735,7 @@ export default function ProfileTab({
                   }
                   required
                 >
-                  <SelectTrigger id="relocationType">
+                  <SelectTrigger id="relocationType" className="w-full">
                     <SelectValue placeholder="이주 목적을 선택하세요" />
                   </SelectTrigger>
                   <SelectContent>
@@ -746,7 +746,7 @@ export default function ProfileTab({
                 </Select>
               </div>
 
-              <div className="space-y-2 col-span-2">
+              <div className="space-y-2 md:col-span-2 lg:col-span-2">
                 <Label>
                   이주 예정일 <span className="text-destructive">*</span>
                 </Label>

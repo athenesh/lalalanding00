@@ -153,8 +153,9 @@ directives: {
 
 1. middleware.ts에서 Clerk 자동 CSP 구성 사용 (default 모드)
 2. Supabase 도메인을 connect-src에 추가
-3. next.config.ts에서 수동 CSP 헤더 제거 (Clerk가 자동 처리)
-4. app/layout.tsx의 ClerkProvider에 dynamic prop 추가
+3. Vercel Live 도메인을 개발 환경에서만 허용 (connect-src, frame-src, script-src)
+4. next.config.ts에서 수동 CSP 헤더 제거 (Clerk가 자동 처리)
+5. app/layout.tsx의 ClerkProvider에 dynamic prop 추가
 
 middleware.ts
 
@@ -165,6 +166,7 @@ const isPublicRoute = createRouteMatcher([
 "/",
 "/sign-in(.*)",
 "/sign-up(.*)",
+"/select-role",
 ]);
 
 export default clerkMiddleware(
@@ -176,8 +178,24 @@ async (auth, req) => {
 contentSecurityPolicy: {
 directives: {
 "connect-src": [
-"https://*.supabase.co",
-"wss://*.supabase.co",
+"https://_.supabase.co",
+"wss://_.supabase.co",
+// Vercel Live (개발 환경 전용)
+...(process.env.NODE_ENV === "development"
+? ["https://vercel.live"]
+: []),
+],
+"frame-src": [
+// Vercel Live (개발 환경 전용)
+...(process.env.NODE_ENV === "development"
+? ["https://vercel.live"]
+: []),
+],
+"script-src": [
+// Vercel Live (개발 환경 전용)
+...(process.env.NODE_ENV === "development"
+? ["https://vercel.live"]
+: []),
 ],
 },
 },
@@ -235,6 +253,61 @@ export default nextConfig;
 - Supabase를 사용하는 경우 connect-src에 https://_.supabase.co와 wss://\_.supabase.co를 반드시 추가해야 합니다.
 - ClerkProvider에 dynamic prop을 추가하면 CSP nonce가 자동으로 전달됩니다.
 - next.config.ts에서 Content-Security-Policy 헤더를 제거해야 Clerk의 자동 CSP와 충돌하지 않습니다.
+
+### 프로덕션 환경에서의 Vercel Live CSP 에러
+
+**에러 메시지**:
+
+```
+Framing 'https://vercel.live/' violates the following Content Security Policy directive: "frame-src 'self' https://challenges.cloudflare.com https://*.js.stripe.com https://js.stripe.com https://hooks.stripe.com"
+```
+
+**원인**: Vercel Live는 개발 도구이지만, 프로덕션 환경에서도 CSP 에러가 발생할 수 있습니다.
+
+**해결 방법**:
+
+프로덕션 환경에서는 Vercel Live가 자동으로 비활성화되어야 하지만, CSP 에러가 발생하는 경우 `middleware.ts`에서 개발 환경에서만 허용하도록 설정:
+
+```typescript
+// middleware.ts
+export default clerkMiddleware(
+  async (auth, req) => {
+    // ... 인증 로직
+  },
+  {
+    contentSecurityPolicy: {
+      directives: {
+        "connect-src": [
+          "https://*.supabase.co",
+          "wss://*.supabase.co",
+          // Vercel Live (개발 환경 전용)
+          ...(process.env.NODE_ENV === "development"
+            ? ["https://vercel.live"]
+            : []),
+        ],
+        "frame-src": [
+          // Vercel Live (개발 환경 전용)
+          ...(process.env.NODE_ENV === "development"
+            ? ["https://vercel.live"]
+            : []),
+        ],
+        "script-src": [
+          // Vercel Live (개발 환경 전용)
+          ...(process.env.NODE_ENV === "development"
+            ? ["https://vercel.live"]
+            : []),
+        ],
+      },
+    },
+  },
+);
+```
+
+**주의사항**:
+
+- Vercel Live CSP 에러는 애플리케이션 기능에 영향을 주지 않습니다.
+- 프로덕션 환경에서는 Vercel Live가 자동으로 비활성화되어야 합니다.
+- 에러가 계속 발생하면 Vercel 설정에서 Live 기능을 확인하세요.
   수동 CSP 구성
   다음 예시는 Next.js 설정 파일에서 애플리케이션 자산과 Clerk가 올바르게 로드되고 작동하는 데 필요한 지시문을 설정하는 방법을 보여줍니다. 예시에 사용된 값은 Clerk 대시보드에서 현재 선택된 인스턴스를 기반으로 생성됩니다. 개발 인스턴스와 프로덕션 인스턴스 호스트를 모두 정확하게 설정해야 합니다.
 
@@ -310,14 +383,13 @@ const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
 // format the CSP header
 const cspHeader = `    default-src 'self';
     script-src 'self' 'strict-dynamic' 'nonce-${nonce}' https: http: ${
-      process.env.NODE_ENV === 'production' ? '' :`'unsafe-eval'`   };
+      process.env.NODE_ENV === 'production' ? '' :`'unsafe-eval'`  };
     connect-src 'self' https://rapid-anteater-86.clerk.accounts.dev;
     img-src 'self' https://img.clerk.com;
     worker-src 'self' blob:;
     style-src 'self';
     frame-src 'self' https://challenges.cloudflare.com;
-    form-action 'self';
-`
+    form-action 'self';`
 // Replace newline characters and spaces
 const contentSecurityPolicyHeaderValue = cspHeader.replace(/\s{2,}/g, ' ').trim()
 
