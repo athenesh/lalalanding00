@@ -600,8 +600,8 @@ export default function ProfileTab({
         <CardContent>
           <div className="space-y-6">
             {/* 첫 번째 줄: 이름과 생년월일 */}
-            <div className="grid grid-cols-4 gap-2 md:gap-4 lg:gap-6">
-              <div className="space-y-2 min-w-0 col-span-1">
+            <div className="grid grid-cols-12 gap-2 md:gap-4 lg:gap-6">
+              <div className="space-y-2 min-w-0 col-span-3">
                 <Label htmlFor="name">
                   이름 <span className="text-destructive">*</span>
                 </Label>
@@ -611,12 +611,13 @@ export default function ProfileTab({
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  placeholder="홍길동"
+                  placeholder="영문이름"
                   required
+                  className="w-full"
                 />
               </div>
 
-              <div className="space-y-2 min-w-0 overflow-hidden -mx-1 md:-mx-2 lg:mx-0 col-span-3">
+              <div className="space-y-2 min-w-0 overflow-hidden -mx-1 md:-mx-2 lg:mx-0 col-span-9">
                 <Label>생년월일</Label>
                 <div className="flex items-center gap-0.5 md:gap-1 min-w-0">
                   <div className="flex-1 min-w-0 max-w-[140px] md:max-w-[150px] lg:max-w-[160px]">
@@ -711,8 +712,8 @@ export default function ProfileTab({
             </div>
 
             {/* 두 번째 줄: 직업과 이메일 */}
-            <div className="grid grid-cols-2 gap-2 md:gap-4 lg:gap-6">
-              <div className="space-y-2">
+            <div className="grid grid-cols-12 gap-2 md:gap-4 lg:gap-6">
+              <div className="space-y-2 col-span-3">
                 <Label htmlFor="occupation">
                   직업 <span className="text-destructive">*</span>
                 </Label>
@@ -724,17 +725,17 @@ export default function ProfileTab({
                   required
                 >
                   <SelectTrigger id="occupation" className="w-full">
-                    <SelectValue placeholder="직업을 선택하세요" />
+                    <SelectValue placeholder="선택" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="doctor">의사</SelectItem>
-                    <SelectItem value="employee">회사 직원</SelectItem>
+                    <SelectItem value="employee">직장인</SelectItem>
                     <SelectItem value="student">학생</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 col-span-9">
                 <Label htmlFor="email">
                   이메일 <span className="text-destructive">*</span>
                 </Label>
@@ -765,7 +766,7 @@ export default function ProfileTab({
                   required
                 >
                   <SelectTrigger id="relocationType" className="w-full">
-                    <SelectValue placeholder="이주 목적을 선택하세요" />
+                    <SelectValue placeholder="선택" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="주재원">주재원</SelectItem>
@@ -926,7 +927,7 @@ export default function ProfileTab({
                                     e.target.value,
                                   )
                                 }
-                                placeholder="이름"
+                                placeholder="영문이름"
                                 required
                               />
                             </div>
