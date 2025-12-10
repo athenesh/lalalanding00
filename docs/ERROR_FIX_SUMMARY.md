@@ -337,6 +337,55 @@ WITH CHECK (
 - `FINAL_CORRECT_FIX.sql`: 최종 해결 SQL 파일
 - `CORRECT_STORAGE_POLICY.sql`: Supabase 공식 문서 기준 정책
 
+### 9. 에이전트가 클라이언트의 체크리스트 파일을 확인할 수 없는 문제
+
+**원인**: 에이전트 유저가 클라이언트 유저의 체크리스트 탭에서 업로드된 파일을 확인할 수 없었습니다.
+
+**상세 분석**:
+
+1. **Storage RLS 정책에 에이전트 접근 권한이 없음**
+
+   - 기존 Storage RLS 정책은 본인 폴더와 권한 부여된 클라이언트 폴더만 허용
+   - 에이전트가 자신의 클라이언트(`clients.owner_agent_id`)의 파일에 접근하는 정책이 없음
+
+2. **API 라우트에서 에이전트 접근 차단**
+
+   - `/api/client/checklist/files` API는 `requireClientOrAuthorized()`를 사용
+   - `getClientIdForUser()` 함수가 에이전트의 경우 `null`을 반환하여 접근 차단
+   - 에이전트는 `clients` 테이블에 직접 연결되지 않고 `accounts` 테이블과 `clients.owner_agent_id`를 통해 연결됨
+
+3. **파일 다운로드 API도 동일한 문제**
+   - `/api/client/checklist/files/download`에서도 에이전트 접근이 차단됨
+
+**최종 해결 방법**:
+
+1. **Storage RLS 정책 업데이트**: 문서의 패턴(`IN` 절 사용)을 따라 에이전트 접근 권한 추가
+2. **인증 함수 추가**: `lib/auth.ts`에 `canAgentAccessClient()` 함수 추가
+3. **API 라우트 수정**: `/api/client/checklist/files`와 `/api/client/checklist/files/download`에 에이전트 접근 허용 로직 추가
+
+**주의사항**:
+
+- PostgreSQL 정책 이름은 최대 63자로 제한됨
+- 정책 이름이 너무 길면 "policy already exists" 오류 발생 가능
+- 짧고 명확한 이름 사용 권장 (예: `"Users can view own authorized or agent client files"`)
+
+**해결 결과**:
+
+- ✅ 에이전트가 클라이언트의 체크리스트 파일을 정상적으로 확인할 수 있게 됨
+- ✅ Storage RLS 정책이 올바르게 작동하여 보안과 기능이 모두 유지됨
+- ✅ API 라우트에서 에이전트 접근이 정상적으로 허용됨
+
+**적용된 변경사항**:
+
+- `lib/auth.ts`: `canAgentAccessClient()` 함수 추가
+- `app/api/client/checklist/files/route.ts`: GET, POST, DELETE에 에이전트 접근 허용
+- `app/api/client/checklist/files/download/route.ts`: 에이전트 접근 허용
+- Storage RLS 정책: 에이전트 접근 권한 추가 (문서의 `IN` 절 패턴 사용)
+
+**참고 파일**:
+
+- `fix_agent_storage_access.sql`: Storage RLS 정책 업데이트 SQL 파일
+
 ## 참고 자료
 
 - [Supabase Clerk 통합 가이드](https://supabase.com/docs/guides/auth/third-party/clerk)

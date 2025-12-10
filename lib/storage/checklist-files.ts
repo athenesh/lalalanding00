@@ -112,9 +112,10 @@ export async function uploadChecklistFile(
       });
 
     if (uploadError) {
+      const statusCode = (uploadError as any).statusCode;
       console.error("[checklist-files] Storage 업로드 실패:", {
         error: uploadError.message,
-        statusCode: uploadError.statusCode,
+        ...(statusCode && { statusCode }),
         filePath,
         folderName,
         clerkUserId,

@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server';
-import { getClientIdForUser, requireClientOrAuthorized } from '@/lib/auth';
+import { getClientIdForUser, requireClientOrAuthorized, getAuthRole, canAgentAccessClient } from '@/lib/auth';
 import { createClerkSupabaseClient } from '@/lib/supabase/server';
 
 /**
  * GET /api/client/checklist/files/download?document_id={document_id}
  * 체크리스트 파일 다운로드 (Signed URL 생성)
- * 권한 부여된 사용자도 다운로드 가능합니다.
+ * 권한 부여된 사용자와 에이전트도 다운로드 가능합니다.
  */
 export async function GET(request: Request) {
   try {
     console.log('[API] GET /api/client/checklist/files/download 호출');
 
-    await requireClientOrAuthorized();
+    const role = await getAuthRole();
     const supabase = createClerkSupabaseClient();
 
     const { searchParams } = new URL(request.url);
@@ -38,14 +38,26 @@ export async function GET(request: Request) {
       );
     }
 
-    // 클라이언트 본인 또는 권한 부여된 사용자의 client_id 조회
-    const clientId = await getClientIdForUser();
+    // 에이전트인 경우: 클라이언트 소유권 확인
+    if (role === 'agent') {
+      const canAccess = await canAgentAccessClient(document.client_id);
+      if (!canAccess) {
+        return NextResponse.json(
+          { error: '접근 권한이 없습니다.' },
+          { status: 403 }
+        );
+      }
+    } else {
+      // 클라이언트 또는 권한 부여된 사용자인 경우
+      await requireClientOrAuthorized();
+      const clientId = await getClientIdForUser();
 
-    if (!clientId || clientId !== document.client_id) {
-      return NextResponse.json(
-        { error: '접근 권한이 없습니다.' },
-        { status: 403 }
-      );
+      if (!clientId || clientId !== document.client_id) {
+        return NextResponse.json(
+          { error: '접근 권한이 없습니다.' },
+          { status: 403 }
+        );
+      }
     }
 
     // file_url에서 파일 경로 추출

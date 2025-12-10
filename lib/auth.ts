@@ -167,6 +167,55 @@ export async function getClientIdForUser(): Promise<string | null> {
 }
 
 /**
+ * 에이전트가 특정 클라이언트에 접근할 수 있는지 확인합니다.
+ * 에이전트가 해당 클라이언트의 소유자인지 확인합니다.
+ *
+ * @param clientId 확인할 클라이언트 ID
+ * @returns 접근 가능하면 true, 아니면 false
+ */
+export async function canAgentAccessClient(
+  clientId: string,
+): Promise<boolean> {
+  const userId = await getAuthUserId();
+  const role = await getAuthRole();
+
+  // 에이전트가 아니면 false 반환
+  if (role !== "agent") {
+    return false;
+  }
+
+  const supabase = createClerkSupabaseClient();
+
+  // Account 조회 또는 자동 생성
+  const account = await getOrCreateAccount();
+
+  // 클라이언트 소유권 확인
+  const { data: client, error: clientError } = await supabase
+    .from("clients")
+    .select("id, owner_agent_id")
+    .eq("id", clientId)
+    .eq("owner_agent_id", account.id)
+    .single();
+
+  if (clientError || !client) {
+    console.log("[Auth] 에이전트 클라이언트 접근 권한 없음:", {
+      userId,
+      clientId,
+      accountId: account.id,
+      error: clientError?.message,
+    });
+    return false;
+  }
+
+  console.log("[Auth] 에이전트 클라이언트 접근 권한 확인:", {
+    userId,
+    clientId,
+    accountId: account.id,
+  });
+  return true;
+}
+
+/**
  * 클라이언트 또는 권한 부여된 사용자인지 확인합니다.
  * 둘 다 아닌 경우 홈으로 리다이렉트합니다.
  *

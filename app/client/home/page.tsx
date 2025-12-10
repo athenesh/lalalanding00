@@ -352,7 +352,6 @@ export default function ClientHomePage() {
 
       console.log("[ClientHomePage] 체크리스트 업데이트 항목:", {
         itemCount: itemsToUpdate.length,
-        itemsWithId: itemsToUpdate.filter((item) => item.id).length,
       });
 
       let response: Response;

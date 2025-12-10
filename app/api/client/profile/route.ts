@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { getClientIdForUser, requireClientOrAuthorized } from "@/lib/auth";
+import {
+  getAuthUserId,
+  getClientIdForUser,
+  requireClientOrAuthorized,
+} from "@/lib/auth";
 import { createClerkSupabaseClient } from "@/lib/supabase/server";
 import { updateClientProfileSchema } from "@/lib/validations/api-schemas";
 
@@ -24,6 +28,9 @@ export async function GET() {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
+    // 사용자 ID 조회 (로깅용)
+    const userId = await getAuthUserId();
+
     // 클라이언트 정보 조회 (client_id로)
     const { data: client, error: clientError } = await supabase
       .from("clients")
@@ -34,11 +41,12 @@ export async function GET() {
     if (clientError) {
       console.error("[API] Client fetch error:", {
         userId,
+        clientId,
         error: clientError,
       });
       if (clientError.code === "PGRST116") {
         // 클라이언트를 찾을 수 없음
-        console.warn("[API] Client not found:", { userId });
+        console.warn("[API] Client not found:", { userId, clientId });
         return NextResponse.json(
           { error: "Client not found" },
           { status: 404 },
@@ -116,6 +124,9 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
+    // 사용자 ID 조회 (로깅용)
+    const userId = await getAuthUserId();
+
     // 클라이언트 정보 조회 (client_id로)
     const { data: existingClient, error: fetchError } = await supabase
       .from("clients")
@@ -124,7 +135,11 @@ export async function PATCH(request: Request) {
       .single();
 
     if (fetchError || !existingClient) {
-      console.error("[API] Client not found:", { userId, error: fetchError });
+      console.error("[API] Client not found:", {
+        userId,
+        clientId,
+        error: fetchError,
+      });
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 

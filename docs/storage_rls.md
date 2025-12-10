@@ -779,3 +779,211 @@ if (!isClient && !isAgent && !isAuthorized) {
 ## 참고
 
 이 문제는 `shared_listings` 테이블 메모 업데이트 권한 오류와 동일한 패턴입니다. `shared_listings` 테이블을 업데이트하는 모든 서버 액션에서 권한 부여된 사용자 확인 로직이 포함되어 있는지 확인해야 합니다.
+
+---
+
+# 에이전트가 클라이언트의 체크리스트 파일을 확인할 수 없는 문제
+
+## 문제 상황
+
+**에이전트 유저가 클라이언트 유저의 체크리스트 탭에서 업로드된 파일을 확인할 수 없습니다.**
+
+### 에러 발생 위치
+
+- **파일**: `app/agent/client/[id]/page.tsx` - 에이전트 클라이언트 상세 페이지
+- **탭**: 체크리스트 탭에서 파일 목록 조회
+- **증상**: 파일이 업로드되어 있지만 에이전트가 확인할 수 없음
+
+## 오류 원인
+
+### 핵심 문제
+
+1. **Storage RLS 정책에 에이전트 접근 권한이 없음**
+
+   - 기존 Storage RLS 정책은 다음만 허용:
+     - 본인 폴더 접근
+     - 권한 부여된 클라이언트 폴더 접근 (`client_authorizations` 테이블을 통해)
+   - 에이전트가 자신의 클라이언트(`clients.owner_agent_id`)의 파일에 접근하는 정책이 없음
+
+2. **API 라우트에서 에이전트 접근 차단**
+
+   - `/api/client/checklist/files` API는 `requireClientOrAuthorized()`를 사용
+   - `getClientIdForUser()` 함수가 에이전트의 경우 `null`을 반환하여 접근 차단
+   - 에이전트는 `clients` 테이블에 직접 연결되지 않고 `accounts` 테이블과 `clients.owner_agent_id`를 통해 연결됨
+
+3. **파일 다운로드 API도 동일한 문제**
+   - `/api/client/checklist/files/download`에서도 에이전트 접근이 차단됨
+
+### 에러 발생 시나리오
+
+```
+에이전트 → 클라이언트 체크리스트 탭 열기
+  ↓
+API 호출: /api/client/checklist/files?item_id=...
+  ↓
+requireClientOrAuthorized() → getClientIdForUser() 호출
+  ↓
+에이전트는 clients 테이블에 직접 연결되지 않음 → null 반환
+  ↓
+결과: "접근 권한이 없습니다." (403 에러)
+```
+
+## 해결 방법
+
+### 1. Storage RLS 정책 업데이트
+
+문서의 패턴(`IN` 절 사용)을 따라 Storage RLS 정책에 에이전트 접근 권한을 추가:
+
+```sql
+-- 에이전트: 자신의 클라이언트의 폴더 파일 조회
+-- ⚠️ 핵심: IN 절을 사용하여 name이 storage.objects에서 오는 것을 명확히 함
+(storage.foldername(name))[1] IN (
+  SELECT clients.clerk_user_id
+  FROM public.clients
+  WHERE EXISTS (
+    SELECT 1 FROM public.accounts
+    WHERE accounts.id = clients.owner_agent_id
+    AND accounts.clerk_user_id = ((select auth.jwt())->>'sub')
+  )
+)
+```
+
+**주의사항**:
+
+- PostgreSQL 정책 이름은 최대 63자로 제한됨
+- 정책 이름이 너무 길면 "policy already exists" 오류 발생 가능
+- 짧고 명확한 이름 사용 권장 (예: `"Users can view own authorized or agent client files"`)
+
+### 2. 인증 함수 추가
+
+`lib/auth.ts`에 에이전트 접근 확인 함수 추가:
+
+```typescript
+/**
+ * 에이전트가 특정 클라이언트에 접근할 수 있는지 확인합니다.
+ * 에이전트가 해당 클라이언트의 소유자인지 확인합니다.
+ *
+ * @param clientId 확인할 클라이언트 ID
+ * @returns 접근 가능하면 true, 아니면 false
+ */
+export async function canAgentAccessClient(clientId: string): Promise<boolean> {
+  const userId = await getAuthUserId();
+  const role = await getAuthRole();
+
+  // 에이전트가 아니면 false 반환
+  if (role !== "agent") {
+    return false;
+  }
+
+  const supabase = createClerkSupabaseClient();
+
+  // Account 조회 또는 자동 생성
+  const account = await getOrCreateAccount();
+
+  // 클라이언트 소유권 확인
+  const { data: client, error: clientError } = await supabase
+    .from("clients")
+    .select("id, owner_agent_id")
+    .eq("id", clientId)
+    .eq("owner_agent_id", account.id)
+    .single();
+
+  if (clientError || !client) {
+    return false;
+  }
+
+  return true;
+}
+```
+
+### 3. API 라우트 수정
+
+`/api/client/checklist/files`와 `/api/client/checklist/files/download` API에 에이전트 접근 허용:
+
+```typescript
+// 에이전트인 경우: 클라이언트 소유권 확인
+if (role === "agent") {
+  const canAccess = await canAgentAccessClient(checklistItem.client_id);
+  if (!canAccess) {
+    return NextResponse.json(
+      { error: "접근 권한이 없습니다." },
+      { status: 403 },
+    );
+  }
+} else {
+  // 클라이언트 또는 권한 부여된 사용자인 경우
+  await requireClientOrAuthorized();
+  const clientId = await getClientIdForUser();
+  // ...
+}
+```
+
+## 적용된 변경사항
+
+### 1. `lib/auth.ts`
+
+- `canAgentAccessClient()` 함수 추가: 에이전트가 특정 클라이언트에 접근할 수 있는지 확인
+
+### 2. `app/api/client/checklist/files/route.ts`
+
+- GET: 파일 목록 조회 시 에이전트 접근 허용
+- POST: 파일 업로드 시 에이전트 접근 허용
+- DELETE: 파일 삭제 시 에이전트 접근 허용
+
+### 3. `app/api/client/checklist/files/download/route.ts`
+
+- 파일 다운로드 시 에이전트 접근 허용
+
+### 4. Storage RLS 정책
+
+- 에이전트가 자신의 클라이언트 파일에 접근할 수 있도록 정책 추가
+- 문서의 `IN` 절 패턴 사용
+
+## 해결 결과
+
+- ✅ 에이전트가 클라이언트의 체크리스트 파일을 정상적으로 확인할 수 있게 됨
+- ✅ Storage RLS 정책이 올바르게 작동하여 보안과 기능이 모두 유지됨
+- ✅ API 라우트에서 에이전트 접근이 정상적으로 허용됨
+
+## 참고 파일
+
+- `fix_agent_storage_access.sql`: Storage RLS 정책 업데이트 SQL 파일
+- `lib/auth.ts`: `canAgentAccessClient()` 함수 추가
+- `app/api/client/checklist/files/route.ts`: API 라우트 수정
+- `app/api/client/checklist/files/download/route.ts`: 다운로드 API 수정
+
+## 예방 방법
+
+### 코드 리뷰 체크리스트
+
+Storage 접근 권한을 확인할 때 다음을 확인하세요:
+
+- [ ] 클라이언트 권한 확인
+- [ ] 권한 부여된 사용자 확인
+- [ ] **에이전트 권한 확인** (누락 방지)
+- [ ] Storage RLS 정책과 API 라우트 로직 일치 확인
+
+### 패턴 예시
+
+다른 API 라우트에서도 동일한 패턴을 사용하세요:
+
+```typescript
+// 1. 역할 확인
+const role = await getAuthRole();
+
+// 2. 에이전트인 경우: 클라이언트 소유권 확인
+if (role === "agent") {
+  const canAccess = await canAgentAccessClient(clientId);
+  if (!canAccess) {
+    return NextResponse.json(
+      { error: "접근 권한이 없습니다." },
+      { status: 403 },
+    );
+  }
+} else {
+  // 3. 클라이언트 또는 권한 부여된 사용자인 경우
+  await requireClientOrAuthorized();
+  const userClientId = await getClientIdForUser();
+  // ...
+}
+```

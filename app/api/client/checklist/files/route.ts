@@ -3,6 +3,8 @@ import {
   getAuthUserId,
   getClientIdForUser,
   requireClientOrAuthorized,
+  getAuthRole,
+  canAgentAccessClient,
 } from "@/lib/auth";
 import { createClerkSupabaseClient } from "@/lib/supabase/server";
 import {
@@ -17,12 +19,12 @@ import { uuidSchema } from "@/lib/validations/api-schemas";
 /**
  * GET /api/client/checklist/files?item_id={item_id}
  * 체크리스트 항목의 파일 목록 조회
- * 권한 부여된 사용자도 접근 가능합니다.
+ * 권한 부여된 사용자와 에이전트도 접근 가능합니다.
  */
 export async function GET(request: Request) {
   try {
-    await requireClientOrAuthorized();
     const userId = await getAuthUserId();
+    const role = await getAuthRole();
     const supabase = createClerkSupabaseClient();
 
     const { searchParams } = new URL(request.url);
@@ -58,19 +60,37 @@ export async function GET(request: Request) {
       );
     }
 
-    // 클라이언트 본인 또는 권한 부여된 사용자의 client_id 조회
-    const clientId = await getClientIdForUser();
+    // 에이전트인 경우: 클라이언트 소유권 확인
+    if (role === "agent") {
+      const canAccess = await canAgentAccessClient(checklistItem.client_id);
+      if (!canAccess) {
+        return NextResponse.json(
+          { error: "접근 권한이 없습니다." },
+          { status: 403 },
+        );
+      }
+    } else {
+      // 클라이언트 또는 권한 부여된 사용자인 경우
+      await requireClientOrAuthorized();
+      const clientId = await getClientIdForUser();
 
-    if (!clientId || clientId !== checklistItem.client_id) {
-      return NextResponse.json(
-        { error: "접근 권한이 없습니다." },
-        { status: 403 },
-      );
+      if (!clientId || clientId !== checklistItem.client_id) {
+        return NextResponse.json(
+          { error: "접근 권한이 없습니다." },
+          { status: 403 },
+        );
+      }
     }
 
     // 파일 목록 조회
     const documents = await getChecklistFiles(itemId);
     const files: ChecklistFile[] = documents.map(dbDocumentToFile);
+
+    console.log("[API] 파일 목록 조회 성공:", {
+      itemId,
+      fileCount: files.length,
+      role,
+    });
 
     return NextResponse.json({ files });
   } catch (error) {
@@ -85,15 +105,15 @@ export async function GET(request: Request) {
 /**
  * POST /api/client/checklist/files
  * 체크리스트 항목에 파일 업로드
- * 권한 부여된 사용자도 업로드 가능합니다.
+ * 권한 부여된 사용자와 에이전트도 업로드 가능합니다.
  */
 export async function POST(request: Request) {
   try {
-    await requireClientOrAuthorized();
     const userId = await getAuthUserId();
+    const role = await getAuthRole();
     const supabase = createClerkSupabaseClient();
 
-    console.log("[checklist-files] POST 요청 시작:", { userId });
+    console.log("[checklist-files] POST 요청 시작:", { userId, role });
 
     const formData = await request.formData();
     const file = formData.get("file") as File;
@@ -136,14 +156,30 @@ export async function POST(request: Request) {
       );
     }
 
-    // 클라이언트 본인 또는 권한 부여된 사용자의 client_id 조회
-    const clientId = await getClientIdForUser();
+    let clientId: string;
 
-    if (!clientId || clientId !== checklistItem.client_id) {
-      return NextResponse.json(
-        { error: "접근 권한이 없습니다." },
-        { status: 403 },
-      );
+    // 에이전트인 경우: 클라이언트 소유권 확인
+    if (role === "agent") {
+      const canAccess = await canAgentAccessClient(checklistItem.client_id);
+      if (!canAccess) {
+        return NextResponse.json(
+          { error: "접근 권한이 없습니다." },
+          { status: 403 },
+        );
+      }
+      clientId = checklistItem.client_id;
+    } else {
+      // 클라이언트 또는 권한 부여된 사용자인 경우
+      await requireClientOrAuthorized();
+      const userClientId = await getClientIdForUser();
+
+      if (!userClientId || userClientId !== checklistItem.client_id) {
+        return NextResponse.json(
+          { error: "접근 권한이 없습니다." },
+          { status: 403 },
+        );
+      }
+      clientId = userClientId;
     }
 
     // 클라이언트의 clerk_user_id 조회 (파일 경로 생성용)
@@ -209,12 +245,12 @@ export async function POST(request: Request) {
 /**
  * DELETE /api/client/checklist/files?document_id={document_id}&file_path={file_path}
  * 체크리스트 항목의 파일 삭제
- * 권한 부여된 사용자도 삭제 가능합니다.
+ * 권한 부여된 사용자와 에이전트도 삭제 가능합니다.
  */
 export async function DELETE(request: Request) {
   try {
-    await requireClientOrAuthorized();
     const userId = await getAuthUserId();
+    const role = await getAuthRole();
     const supabase = createClerkSupabaseClient();
 
     const { searchParams } = new URL(request.url);
@@ -260,14 +296,26 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // 클라이언트 본인 또는 권한 부여된 사용자의 client_id 조회
-    const clientId = await getClientIdForUser();
+    // 에이전트인 경우: 클라이언트 소유권 확인
+    if (role === "agent") {
+      const canAccess = await canAgentAccessClient(document.client_id);
+      if (!canAccess) {
+        return NextResponse.json(
+          { error: "접근 권한이 없습니다." },
+          { status: 403 },
+        );
+      }
+    } else {
+      // 클라이언트 또는 권한 부여된 사용자인 경우
+      await requireClientOrAuthorized();
+      const clientId = await getClientIdForUser();
 
-    if (!clientId || clientId !== document.client_id) {
-      return NextResponse.json(
-        { error: "접근 권한이 없습니다." },
-        { status: 403 },
-      );
+      if (!clientId || clientId !== document.client_id) {
+        return NextResponse.json(
+          { error: "접근 권한이 없습니다." },
+          { status: 403 },
+        );
+      }
     }
 
     // 파일 삭제
