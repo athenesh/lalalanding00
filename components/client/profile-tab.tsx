@@ -868,9 +868,9 @@ export default function ProfileTab({
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-6">
-                          {/* 첫 번째 줄: 이름, 관계, 생년월일 */}
-                          <div className="grid grid-cols-4 gap-4">
-                            <div className="space-y-2">
+                          {/* 첫 번째 줄: 이름과 생년월일 */}
+                          <div className="grid grid-cols-2 gap-2 md:gap-4 lg:gap-6">
+                            <div className="space-y-2 min-w-0">
                               <Label>
                                 이름 <span className="text-destructive">*</span>
                               </Label>
@@ -887,39 +887,10 @@ export default function ProfileTab({
                                 required
                               />
                             </div>
-                            <div className="space-y-2">
-                              <Label>
-                                관계 <span className="text-destructive">*</span>
-                              </Label>
-                              <Select
-                                value={member.relationship}
-                                onValueChange={(value) =>
-                                  updateFamilyMember(
-                                    member.id,
-                                    "relationship",
-                                    value,
-                                  )
-                                }
-                                required
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="관계 선택" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="배우자">배우자</SelectItem>
-                                  <SelectItem value="자녀">자녀</SelectItem>
-                                  <SelectItem value="부모">부모</SelectItem>
-                                  <SelectItem value="형제자매">
-                                    형제자매
-                                  </SelectItem>
-                                  <SelectItem value="기타">기타</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2 col-span-2">
+                            <div className="space-y-2 min-w-0 overflow-hidden -mx-1 md:-mx-2 lg:mx-0">
                               <Label>생년월일</Label>
-                              <div className="flex items-center gap-1">
-                                <div className="flex-1 min-w-[60px] max-w-[120px]">
+                              <div className="flex items-center gap-0.5 md:gap-1 min-w-0">
+                                <div className="flex-1 min-w-0 max-w-[110px] md:max-w-[120px] lg:max-w-[130px]">
                                   <Input
                                     type="number"
                                     placeholder="년도 (예: 1990)"
@@ -953,10 +924,10 @@ export default function ProfileTab({
                                     }}
                                     min="1900"
                                     max="2100"
-                                    className="text-center text-sm md:text-base"
+                                    className="text-center text-xs md:text-sm lg:text-base px-2 md:px-3"
                                   />
                                 </div>
-                                <div className="min-w-[56px] max-w-[80px] w-14 md:w-20">
+                                <div className="min-w-0 w-10 md:w-12 lg:w-16 flex-shrink-0">
                                   <Input
                                     type="number"
                                     placeholder="월"
@@ -990,10 +961,10 @@ export default function ProfileTab({
                                     }}
                                     min="1"
                                     max="12"
-                                    className="text-center text-sm md:text-base w-full"
+                                    className="text-center text-xs md:text-sm lg:text-base w-full px-1 md:px-2 lg:px-3"
                                   />
                                 </div>
-                                <div className="min-w-[56px] max-w-[80px] w-14 md:w-20">
+                                <div className="min-w-0 w-10 md:w-12 lg:w-16 flex-shrink-0">
                                   <Input
                                     type="number"
                                     placeholder="일"
@@ -1027,15 +998,44 @@ export default function ProfileTab({
                                     }}
                                     min="1"
                                     max="31"
-                                    className="text-center text-sm md:text-base w-full"
+                                    className="text-center text-xs md:text-sm lg:text-base w-full px-1 md:px-2 lg:px-3"
                                   />
                                 </div>
                               </div>
                             </div>
                           </div>
 
-                          {/* 세 번째 줄: 전화번호와 이메일 */}
-                          <div className="grid grid-cols-4 gap-4">
+                          {/* 두 번째 줄: 관계와 전화번호 */}
+                          <div className="grid grid-cols-2 gap-2 md:gap-4 lg:gap-6">
+                            <div className="space-y-2">
+                              <Label>
+                                관계 <span className="text-destructive">*</span>
+                              </Label>
+                              <Select
+                                value={member.relationship}
+                                onValueChange={(value) =>
+                                  updateFamilyMember(
+                                    member.id,
+                                    "relationship",
+                                    value,
+                                  )
+                                }
+                                required
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="관계 선택" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="배우자">배우자</SelectItem>
+                                  <SelectItem value="자녀">자녀</SelectItem>
+                                  <SelectItem value="부모">부모</SelectItem>
+                                  <SelectItem value="형제자매">
+                                    형제자매
+                                  </SelectItem>
+                                  <SelectItem value="기타">기타</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
                             <div className="space-y-2">
                               <Label>전화번호</Label>
                               <Input
@@ -1050,75 +1050,75 @@ export default function ProfileTab({
                                 placeholder="010-1234-5678"
                               />
                             </div>
-                            <div className="space-y-2 col-span-3">
-                              <Label>이메일</Label>
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  type="email"
-                                  value={member.email}
-                                  onChange={(e) =>
-                                    updateFamilyMember(
-                                      member.id,
-                                      "email",
-                                      e.target.value,
-                                    )
-                                  }
-                                  placeholder="example@email.com"
-                                  className="flex-1"
-                                />
-                                {/* 배우자인 경우 권한 부여 버튼 표시 */}
-                                {member.relationship === "배우자" &&
-                                  member.email && (
-                                    <div className="flex items-center gap-1 shrink-0">
-                                      {(() => {
-                                        // 권한이 부여되었는지 확인
-                                        const isAuthorized =
-                                          member.authorizedClerkUserId &&
-                                          authorizations.has(
-                                            member.authorizedClerkUserId,
-                                          );
+                          </div>
 
-                                        return isAuthorized ? (
-                                          <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="icon"
-                                            onClick={() => {
-                                              if (
-                                                member.authorizedClerkUserId
-                                              ) {
-                                                handleRevokeAccess(
-                                                  member.authorizedClerkUserId,
-                                                );
-                                              }
-                                            }}
-                                            disabled={isLoadingAuth}
-                                            className="h-9 w-9"
-                                            title="권한 해제"
-                                          >
-                                            <UserX className="h-4 w-4" />
-                                          </Button>
-                                        ) : (
-                                          <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="icon"
-                                            onClick={() =>
-                                              handleGrantSpouseAccess(member)
-                                            }
-                                            disabled={
-                                              isLoadingAuth || !member.email
-                                            }
-                                            className="h-9 w-9"
-                                            title="권한 부여"
-                                          >
-                                            <UserCheck className="h-4 w-4" />
-                                          </Button>
+                          {/* 세 번째 줄: 이메일 */}
+                          <div className="space-y-2">
+                            <Label>이메일</Label>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="email"
+                                value={member.email}
+                                onChange={(e) =>
+                                  updateFamilyMember(
+                                    member.id,
+                                    "email",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="example@email.com"
+                                className="flex-1"
+                              />
+                              {/* 배우자인 경우 권한 부여 버튼 표시 */}
+                              {member.relationship === "배우자" &&
+                                member.email && (
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {(() => {
+                                      // 권한이 부여되었는지 확인
+                                      const isAuthorized =
+                                        member.authorizedClerkUserId &&
+                                        authorizations.has(
+                                          member.authorizedClerkUserId,
                                         );
-                                      })()}
-                                    </div>
-                                  )}
-                              </div>
+
+                                      return isAuthorized ? (
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="icon"
+                                          onClick={() => {
+                                            if (member.authorizedClerkUserId) {
+                                              handleRevokeAccess(
+                                                member.authorizedClerkUserId,
+                                              );
+                                            }
+                                          }}
+                                          disabled={isLoadingAuth}
+                                          className="h-9 w-9"
+                                          title="권한 해제"
+                                        >
+                                          <UserX className="h-4 w-4" />
+                                        </Button>
+                                      ) : (
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="icon"
+                                          onClick={() =>
+                                            handleGrantSpouseAccess(member)
+                                          }
+                                          disabled={
+                                            isLoadingAuth || !member.email
+                                          }
+                                          className="h-9 w-9"
+                                          title="권한 부여"
+                                        >
+                                          <UserCheck className="h-4 w-4" />
+                                        </Button>
+                                      );
+                                    })()}
+                                  </div>
+                                )}
                             </div>
                           </div>
 
