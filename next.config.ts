@@ -39,24 +39,7 @@ const nextConfig: NextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
           },
-          {
-            key: "Content-Security-Policy",
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.clerk.com https://*.clerk.accounts.dev https://clerk.lalalanding.net",
-              "worker-src 'self' blob:",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "img-src 'self' data: https: blob:",
-              "font-src 'self' data: https://fonts.gstatic.com",
-              "connect-src 'self' https://*.clerk.com https://*.clerk.accounts.dev https://clerk.lalalanding.net https://*.supabase.co wss://*.supabase.co",
-              "frame-src 'self' https://*.clerk.com https://*.clerk.accounts.dev https://clerk.lalalanding.net",
-              "object-src 'none'",
-              "base-uri 'self'",
-              "form-action 'self'",
-              "frame-ancestors 'none'",
-              "upgrade-insecure-requests",
-            ].join("; "),
-          },
+          // Content-Security-Policy는 Clerk의 자동 CSP 구성으로 처리됨 (middleware.ts)
         ],
       },
     ];

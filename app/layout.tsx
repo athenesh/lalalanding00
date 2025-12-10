@@ -48,6 +48,7 @@ export default function RootLayout({
     <ClerkProvider
       publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
       localization={koKR}
+      dynamic
       appearance={{
         cssLayerName: "clerk", // Required for Tailwind 4 compatibility
       }}
