@@ -91,17 +91,25 @@ export async function requireClient() {
  * 권한 부여된 사용자의 client_id를 조회합니다.
  * 권한이 없으면 null을 반환합니다.
  *
+ * @param userId - Clerk 사용자 ID (선택사항, API 라우트에서 사용 시 직접 전달)
  * @returns 권한 부여된 클라이언트의 client_id 또는 null
  */
-export async function getAuthorizedClientId(): Promise<string | null> {
-  const userId = await getAuthUserId();
+export async function getAuthorizedClientId(
+  userId?: string,
+): Promise<string | null> {
+  const finalUserId = userId || (await getAuthUserId());
+
+  if (!finalUserId) {
+    return null;
+  }
+
   const supabase = createClerkSupabaseClient();
 
   try {
     const { data: authorization, error } = await supabase
       .from("client_authorizations")
       .select("client_id")
-      .eq("authorized_clerk_user_id", userId)
+      .eq("authorized_clerk_user_id", finalUserId)
       .single();
 
     if (error || !authorization) {
@@ -110,7 +118,7 @@ export async function getAuthorizedClientId(): Promise<string | null> {
     }
 
     console.log("[Auth] 권한 부여된 사용자 확인:", {
-      userId,
+      userId: finalUserId,
       clientId: authorization.client_id,
     });
 
@@ -122,6 +130,17 @@ export async function getAuthorizedClientId(): Promise<string | null> {
 }
 
 /**
+ * API 라우트용: 권한 부여된 사용자의 client_id를 조회합니다.
+ * @param userId - Clerk 사용자 ID
+ * @returns 권한 부여된 클라이언트의 client_id 또는 null
+ */
+async function getAuthorizedClientIdForUser(
+  userId: string,
+): Promise<string | null> {
+  return getAuthorizedClientId(userId);
+}
+
+/**
  * 클라이언트 본인 또는 권한 부여된 사용자의 client_id를 반환합니다.
  * 권한 부여된 클라이언트가 있으면 우선적으로 반환합니다.
  * 둘 다 없으면 null을 반환합니다.
@@ -130,18 +149,28 @@ export async function getAuthorizedClientId(): Promise<string | null> {
  * 1. 권한 부여된 클라이언트 (배우자가 권한을 받은 클라이언트)
  * 2. 본인 클라이언트
  *
+ * @param userId - Clerk 사용자 ID (API 라우트에서 사용 시 직접 전달)
  * @returns client_id 또는 null
  */
-export async function getClientIdForUser(): Promise<string | null> {
-  const userId = await getAuthUserId();
+export async function getClientIdForUser(
+  userId?: string,
+): Promise<string | null> {
+  // userId가 제공되지 않으면 getAuthUserId() 호출 (페이지 컴포넌트용)
+  // userId가 제공되면 직접 사용 (API 라우트용)
+  const finalUserId = userId || (await getAuthUserId());
+
+  if (!finalUserId) {
+    return null;
+  }
+
   const supabase = createClerkSupabaseClient();
 
   // 1. 권한 부여된 사용자인지 먼저 확인 (우선순위)
   // 배우자는 항상 권한을 받은 클라이언트의 데이터를 봐야 함
-  const authorizedClientId = await getAuthorizedClientId();
+  const authorizedClientId = await getAuthorizedClientIdForUser(finalUserId);
   if (authorizedClientId) {
     console.log("[Auth] 권한 부여된 클라이언트 우선 반환:", {
-      userId,
+      userId: finalUserId,
       clientId: authorizedClientId,
     });
     return authorizedClientId;
@@ -151,12 +180,12 @@ export async function getClientIdForUser(): Promise<string | null> {
   const { data: ownClient, error: ownClientError } = await supabase
     .from("clients")
     .select("id")
-    .eq("clerk_user_id", userId)
+    .eq("clerk_user_id", finalUserId)
     .single();
 
   if (ownClient && !ownClientError) {
     console.log("[Auth] 본인 클라이언트 확인:", {
-      userId,
+      userId: finalUserId,
       clientId: ownClient.id,
     });
     return ownClient.id;
@@ -173,9 +202,7 @@ export async function getClientIdForUser(): Promise<string | null> {
  * @param clientId 확인할 클라이언트 ID
  * @returns 접근 가능하면 true, 아니면 false
  */
-export async function canAgentAccessClient(
-  clientId: string,
-): Promise<boolean> {
+export async function canAgentAccessClient(clientId: string): Promise<boolean> {
   const userId = await getAuthUserId();
   const role = await getAuthRole();
 

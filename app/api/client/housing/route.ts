@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { getClientIdForUser } from "@/lib/auth";
 import { createClerkSupabaseClient } from "@/lib/supabase/server";
 import { updateHousingSchema } from "@/lib/validations/api-schemas";
@@ -12,10 +13,19 @@ export async function GET() {
   try {
     console.log("[API] GET /api/client/housing 호출");
 
+    // 인증 확인 (리다이렉트 없이)
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
+
     const supabase = createClerkSupabaseClient();
 
     // 클라이언트 본인 또는 권한 부여된 사용자의 client_id 조회
-    const clientId = await getClientIdForUser();
+    const clientId = await getClientIdForUser(userId);
 
     if (!clientId) {
       console.log("[API] 클라이언트 또는 권한 부여된 사용자가 아님");
@@ -88,10 +98,19 @@ export async function PATCH(request: Request) {
   try {
     console.log("[API] PATCH /api/client/housing 호출");
 
+    // 인증 확인 (리다이렉트 없이)
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const supabase = createClerkSupabaseClient();
 
     // 클라이언트 본인 또는 권한 부여된 사용자의 client_id 조회
-    const clientId = await getClientIdForUser();
+    const clientId = await getClientIdForUser(userId);
 
     if (!clientId) {
       console.log("[API] 클라이언트 또는 권한 부여된 사용자가 아님");
