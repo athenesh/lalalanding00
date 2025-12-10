@@ -1006,8 +1006,8 @@ export default function ProfileTab({
                           </div>
 
                           {/* 두 번째 줄: 관계와 전화번호 */}
-                          <div className="grid grid-cols-2 gap-2 md:gap-4 lg:gap-6">
-                            <div className="space-y-2">
+                          <div className="grid grid-cols-3 gap-2 md:gap-4 lg:gap-6">
+                            <div className="space-y-2 col-span-1">
                               <Label>
                                 관계 <span className="text-destructive">*</span>
                               </Label>
@@ -1036,7 +1036,7 @@ export default function ProfileTab({
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-2 col-span-2">
                               <Label>전화번호</Label>
                               <Input
                                 value={member.phone}

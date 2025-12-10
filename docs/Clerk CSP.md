@@ -179,7 +179,7 @@ contentSecurityPolicy: {
 directives: {
 "connect-src": [
 "https://_.supabase.co",
-"wss://_.supabase.co",
+"wss://\_.supabase.co",
 // Vercel Live (개발 환경 전용)
 ...(process.env.NODE_ENV === "development"
 ? ["https://vercel.live"]
