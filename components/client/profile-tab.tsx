@@ -616,10 +616,10 @@ export default function ProfileTab({
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 min-w-0">
                 <Label>생년월일</Label>
-                <div className="flex items-center gap-1">
-                  <div className="flex-1 min-w-[60px] max-w-[120px]">
+                <div className="flex items-center gap-1 min-w-0">
+                  <div className="flex-1 min-w-0 max-w-[100px]">
                     <Input
                       type="number"
                       placeholder="년도 (예: 1990)"
@@ -634,7 +634,7 @@ export default function ProfileTab({
                       className="text-center text-sm md:text-base"
                     />
                   </div>
-                  <div className="min-w-[56px] max-w-[80px] w-14 md:w-20">
+                  <div className="min-w-0 w-12 md:w-16 flex-shrink-0">
                     <Input
                       type="number"
                       placeholder="월"
@@ -649,7 +649,7 @@ export default function ProfileTab({
                       className="text-center text-sm md:text-base w-full"
                     />
                   </div>
-                  <div className="min-w-[56px] max-w-[80px] w-14 md:w-20">
+                  <div className="min-w-0 w-12 md:w-16 flex-shrink-0">
                     <Input
                       type="number"
                       placeholder="일"
@@ -701,7 +701,7 @@ export default function ProfileTab({
             </div>
 
             {/* 세 번째 줄: 직업, 이주 목적, 이주 예정일 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 lg:gap-6">
               <div className="space-y-2">
                 <Label htmlFor="occupation">
                   직업 <span className="text-destructive">*</span>
@@ -746,7 +746,7 @@ export default function ProfileTab({
                 </Select>
               </div>
 
-              <div className="space-y-2 md:col-span-2 lg:col-span-2">
+              <div className="space-y-2 col-span-2 lg:col-span-2">
                 <Label>
                   이주 예정일 <span className="text-destructive">*</span>
                 </Label>
