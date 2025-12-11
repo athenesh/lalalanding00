@@ -601,7 +601,7 @@ export default function ProfileTab({
           <div className="space-y-6">
             {/* 첫 번째 줄: 이름과 생년월일 */}
             <div className="grid grid-cols-12 gap-2 md:gap-4 lg:gap-6">
-              <div className="space-y-2 min-w-0 col-span-3">
+              <div className="space-y-2 min-w-0 col-span-6">
                 <Label htmlFor="name">
                   이름 <span className="text-destructive">*</span>
                 </Label>
@@ -617,7 +617,7 @@ export default function ProfileTab({
                 />
               </div>
 
-              <div className="space-y-2 min-w-0 overflow-hidden -mx-1 md:-mx-2 lg:mx-0 col-span-9">
+햐햐              <div className="space-y-2 min-w-0 overflow-hidden -mx-1 md:-mx-2 lg:mx-0 col-span-6">
                 <Label>생년월일</Label>
                 <div className="flex items-center gap-0.5 md:gap-1 min-w-0">
                   <div className="flex-1 min-w-0 max-w-[140px] md:max-w-[150px] lg:max-w-[160px]">
@@ -713,7 +713,7 @@ export default function ProfileTab({
 
             {/* 두 번째 줄: 직업과 이메일 */}
             <div className="grid grid-cols-12 gap-2 md:gap-4 lg:gap-6">
-              <div className="space-y-2 col-span-3">
+              <div className="space-y-2 col-span-4">
                 <Label htmlFor="occupation">
                   직업 <span className="text-destructive">*</span>
                 </Label>
@@ -735,7 +735,7 @@ export default function ProfileTab({
                 </Select>
               </div>
 
-              <div className="space-y-2 col-span-9">
+              <div className="space-y-2 col-span-8">
                 <Label htmlFor="email">
                   이메일 <span className="text-destructive">*</span>
                 </Label>
