@@ -613,7 +613,7 @@ export default function ProfileTab({
                   }
                   placeholder="영문이름"
                   required
-                  className="w-[85%] text-xs md:text-sm lg:text-base"
+                  className="w-[93.5%] text-xs md:text-sm lg:text-base"
                 />
               </div>
 
@@ -916,7 +916,7 @@ export default function ProfileTab({
                         <div className="space-y-6">
                           {/* 첫 번째 줄: 이름과 관계 */}
                           <div className="flex flex-row gap-2 md:gap-4 lg:gap-6 items-end">
-                            <div className="space-y-2 min-w-0 flex-[1.15]">
+                            <div className="space-y-2 min-w-0 flex-[1.265]">
                               <Label>
                                 이름 <span className="text-destructive">*</span>
                               </Label>
@@ -934,7 +934,7 @@ export default function ProfileTab({
                                 className="text-xs md:text-sm lg:text-base"
                               />
                             </div>
-                            <div className="space-y-2 min-w-0 flex-1">
+                            <div className="space-y-2 min-w-0 flex-basis-[33.333%] flex-shrink-0">
                               <Label>
                                 관계 <span className="text-destructive">*</span>
                               </Label>
