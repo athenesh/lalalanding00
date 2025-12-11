@@ -613,11 +613,11 @@ export default function ProfileTab({
                   }
                   placeholder="영문이름"
                   required
-                  className="w-full"
+                  className="w-full text-xs md:text-sm lg:text-base"
                 />
               </div>
 
-햐햐              <div className="space-y-2 min-w-0 overflow-hidden -mx-1 md:-mx-2 lg:mx-0 col-span-6">
+              <div className="space-y-2 min-w-0 overflow-hidden -mx-1 md:-mx-2 lg:mx-0 col-span-6">
                 <Label>생년월일</Label>
                 <div className="flex items-center gap-0.5 md:gap-1 min-w-0">
                   <div className="flex-1 min-w-0 max-w-[140px] md:max-w-[150px] lg:max-w-[160px]">
@@ -748,6 +748,7 @@ export default function ProfileTab({
                   }
                   placeholder="example@email.com"
                   required
+                  className="text-xs md:text-sm lg:text-base"
                 />
               </div>
             </div>
@@ -786,6 +787,7 @@ export default function ProfileTab({
                     setFormData({ ...formData, phone: e.target.value })
                   }
                   placeholder="010-1234-5678"
+                  className="text-xs md:text-sm lg:text-base"
                 />
               </div>
             </div>
@@ -808,7 +810,7 @@ export default function ProfileTab({
                     }}
                     min="1900"
                     max="2100"
-                    className="text-center text-sm md:text-base"
+                    className="text-center text-xs md:text-sm lg:text-base"
                   />
                 </div>
                 <div className="min-w-[56px] max-w-[80px] w-14 md:w-20">
@@ -823,7 +825,7 @@ export default function ProfileTab({
                     }}
                     min="1"
                     max="12"
-                    className="text-center text-sm md:text-base w-full"
+                    className="text-center text-xs md:text-sm lg:text-base w-full"
                   />
                 </div>
                 <div className="min-w-[56px] max-w-[80px] w-14 md:w-20">
@@ -838,7 +840,7 @@ export default function ProfileTab({
                     }}
                     min="1"
                     max="31"
-                    className="text-center text-sm md:text-base w-full"
+                    className="text-center text-xs md:text-sm lg:text-base w-full"
                   />
                 </div>
               </div>
@@ -929,6 +931,7 @@ export default function ProfileTab({
                                 }
                                 placeholder="영문이름"
                                 required
+                                className="text-xs md:text-sm lg:text-base"
                               />
                             </div>
                             <div className="space-y-2 min-w-0 overflow-hidden -mx-1 md:-mx-2 lg:mx-0">
@@ -1143,6 +1146,7 @@ export default function ProfileTab({
                                   )
                                 }
                                 placeholder="010-1234-5678"
+                                className="text-xs md:text-sm lg:text-base"
                               />
                             </div>
                           </div>
@@ -1162,7 +1166,7 @@ export default function ProfileTab({
                                   )
                                 }
                                 placeholder="example@email.com"
-                                className="flex-1"
+                                className="flex-1 text-xs md:text-sm lg:text-base"
                               />
                               {/* 배우자인 경우 권한 부여 버튼 표시 */}
                               {member.relationship === "배우자" &&
@@ -1230,6 +1234,7 @@ export default function ProfileTab({
                                 )
                               }
                               placeholder="추가 정보 (선택사항)"
+                              className="text-xs md:text-sm lg:text-base"
                             />
                           </div>
                         </div>
@@ -1299,6 +1304,7 @@ export default function ProfileTab({
                                 }
                                 placeholder="이름"
                                 required
+                                className="text-xs md:text-sm lg:text-base"
                               />
                             </div>
                             <div className="space-y-2">
@@ -1348,6 +1354,7 @@ export default function ProfileTab({
                                 }
                                 placeholder="010-1234-5678"
                                 required
+                                className="text-xs md:text-sm lg:text-base"
                               />
                             </div>
                             <div className="space-y-2">
@@ -1363,6 +1370,7 @@ export default function ProfileTab({
                                   )
                                 }
                                 placeholder="example@email.com"
+                                className="text-xs md:text-sm lg:text-base"
                               />
                             </div>
                           </div>
@@ -1380,6 +1388,7 @@ export default function ProfileTab({
                                 )
                               }
                               placeholder="카카오톡 ID (선택사항)"
+                              className="text-xs md:text-sm lg:text-base"
                             />
                           </div>
                         </div>
