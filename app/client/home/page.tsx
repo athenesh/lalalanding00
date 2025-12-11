@@ -695,27 +695,30 @@ export default function ClientHomePage() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-6">
-          <div className="grid grid-cols-4 gap-4">
-            <Card className="col-span-1">
-              <CardContent className="p-6 pt-6 h-full flex flex-col justify-center">
-                <div className="text-center space-y-4">
-                  <Calendar className="h-12 w-12 mx-auto text-primary" />
+          <Card className="w-full">
+            <CardContent className="p-6 pt-6">
+              <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-stretch">
+                {/* D-day 섹션 */}
+                <div className="flex-1 flex flex-col justify-center items-center space-y-4 min-w-0">
+                  <Calendar className="h-12 w-12 text-primary flex-shrink-0" />
                   <div className="text-4xl font-bold text-primary">
                     D-{daysUntilMoving}
                   </div>
                   <p className="text-muted-foreground">이주까지</p>
                   <p className="text-sm text-muted-foreground">
-                    {new Date(clientData.movingDate).toLocaleDateString(
-                      "ko-KR",
-                    )}
+                    {clientData.movingDate
+                      ? new Date(clientData.movingDate).toLocaleDateString(
+                          "ko-KR",
+                        )
+                      : "날짜 미설정"}
                   </p>
                 </div>
-              </CardContent>
-            </Card>
 
-            <Card className="col-span-3">
-              <CardContent className="p-6 pt-6">
-                <div className="space-y-4">
+                {/* 구분선 (데스크톱에서만 표시) */}
+                <div className="hidden md:block w-px bg-border self-stretch" />
+
+                {/* 준비 진행도 섹션 */}
+                <div className="flex-1 flex flex-col justify-center space-y-4 min-w-0 w-full md:w-auto">
                   <div className="text-center">
                     <div className="text-4xl font-bold text-success">
                       {clientData.checklistCompletion}%
@@ -738,9 +741,9 @@ export default function ClientHomePage() {
                     />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <Tabs defaultValue="profile" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
