@@ -613,14 +613,14 @@ export default function ProfileTab({
                   }
                   placeholder="영문이름"
                   required
-                  className="w-full text-xs md:text-sm lg:text-base"
+                  className="w-[85%] text-xs md:text-sm lg:text-base"
                 />
               </div>
 
               <div className="space-y-2 min-w-0 overflow-hidden -mx-1 md:-mx-2 lg:mx-0 col-span-6">
                 <Label>생년월일</Label>
                 <div className="flex items-center gap-0.5 md:gap-1 min-w-0">
-                  <div className="flex-1 min-w-0 max-w-[140px] md:max-w-[150px] lg:max-w-[160px]">
+                  <div className="flex-1 min-w-0 max-w-[168px] md:max-w-[180px] lg:max-w-[192px]">
                     <Input
                       type="number"
                       placeholder="년도 (예: 1990)"
@@ -649,7 +649,7 @@ export default function ProfileTab({
                       className="text-center text-xs md:text-sm lg:text-base px-2 md:px-3"
                     />
                   </div>
-                  <div className="min-w-0 w-12 md:w-14 lg:w-16 flex-shrink-0">
+                  <div className="min-w-0 w-10 md:w-12 lg:w-14 flex-shrink-0">
                     <Input
                       type="number"
                       placeholder="월"
@@ -678,7 +678,7 @@ export default function ProfileTab({
                       className="text-center text-xs md:text-sm lg:text-base w-full px-1 md:px-2 lg:px-3"
                     />
                   </div>
-                  <div className="min-w-0 w-12 md:w-14 lg:w-16 flex-shrink-0">
+                  <div className="min-w-0 w-10 md:w-12 lg:w-14 flex-shrink-0">
                     <Input
                       type="number"
                       placeholder="일"
@@ -914,9 +914,9 @@ export default function ProfileTab({
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-6">
-                          {/* 첫 번째 줄: 이름과 생년월일 */}
-                          <div className="grid grid-cols-2 gap-2 md:gap-4 lg:gap-6">
-                            <div className="space-y-2 min-w-0">
+                          {/* 첫 번째 줄: 이름과 관계 */}
+                          <div className="flex flex-row gap-2 md:gap-4 lg:gap-6 items-end">
+                            <div className="space-y-2 min-w-0 flex-[1.15]">
                               <Label>
                                 이름 <span className="text-destructive">*</span>
                               </Label>
@@ -934,178 +934,7 @@ export default function ProfileTab({
                                 className="text-xs md:text-sm lg:text-base"
                               />
                             </div>
-                            <div className="space-y-2 min-w-0 overflow-hidden -mx-1 md:-mx-2 lg:mx-0">
-                              <Label>생년월일</Label>
-                              <div className="flex items-center gap-0.5 md:gap-1 min-w-0">
-                                <div className="flex-1 min-w-0 max-w-[110px] md:max-w-[120px] lg:max-w-[130px]">
-                                  <Input
-                                    type="number"
-                                    placeholder="년도 (예: 1990)"
-                                    value={
-                                      member.birthDate
-                                        ? member.birthDate
-                                            .getFullYear()
-                                            .toString()
-                                        : ""
-                                    }
-                                    onChange={(e) => {
-                                      const year = e.target.value.replace(
-                                        /[^0-9]/g,
-                                        "",
-                                      );
-                                      const month = member.birthDate
-                                        ? (
-                                            member.birthDate.getMonth() + 1
-                                          ).toString()
-                                        : "";
-                                      const day = member.birthDate
-                                        ? member.birthDate.getDate().toString()
-                                        : "";
-                                      const date = createDateFromInputs(
-                                        year,
-                                        month,
-                                        day,
-                                      );
-                                      updateFamilyMember(
-                                        member.id,
-                                        "birthDate",
-                                        date,
-                                      );
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (
-                                        !/[0-9]/.test(e.key) &&
-                                        ![
-                                          "Backspace",
-                                          "Delete",
-                                          "ArrowLeft",
-                                          "ArrowRight",
-                                          "Tab",
-                                        ].includes(e.key)
-                                      ) {
-                                        e.preventDefault();
-                                      }
-                                    }}
-                                    min="1900"
-                                    max="2100"
-                                    className="text-center text-xs md:text-sm lg:text-base px-2 md:px-3"
-                                  />
-                                </div>
-                                <div className="min-w-0 w-10 md:w-12 lg:w-16 flex-shrink-0">
-                                  <Input
-                                    type="number"
-                                    placeholder="월"
-                                    value={
-                                      member.birthDate
-                                        ? (
-                                            member.birthDate.getMonth() + 1
-                                          ).toString()
-                                        : ""
-                                    }
-                                    onChange={(e) => {
-                                      const year = member.birthDate
-                                        ? member.birthDate
-                                            .getFullYear()
-                                            .toString()
-                                        : "";
-                                      const month = e.target.value.replace(
-                                        /[^0-9]/g,
-                                        "",
-                                      );
-                                      const day = member.birthDate
-                                        ? member.birthDate.getDate().toString()
-                                        : "";
-                                      const date = createDateFromInputs(
-                                        year,
-                                        month,
-                                        day,
-                                      );
-                                      updateFamilyMember(
-                                        member.id,
-                                        "birthDate",
-                                        date,
-                                      );
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (
-                                        !/[0-9]/.test(e.key) &&
-                                        ![
-                                          "Backspace",
-                                          "Delete",
-                                          "ArrowLeft",
-                                          "ArrowRight",
-                                          "Tab",
-                                        ].includes(e.key)
-                                      ) {
-                                        e.preventDefault();
-                                      }
-                                    }}
-                                    min="1"
-                                    max="12"
-                                    className="text-center text-xs md:text-sm lg:text-base w-full px-1 md:px-2 lg:px-3"
-                                  />
-                                </div>
-                                <div className="min-w-0 w-10 md:w-12 lg:w-16 flex-shrink-0">
-                                  <Input
-                                    type="number"
-                                    placeholder="일"
-                                    value={
-                                      member.birthDate
-                                        ? member.birthDate.getDate().toString()
-                                        : ""
-                                    }
-                                    onChange={(e) => {
-                                      const year = member.birthDate
-                                        ? member.birthDate
-                                            .getFullYear()
-                                            .toString()
-                                        : "";
-                                      const month = member.birthDate
-                                        ? (
-                                            member.birthDate.getMonth() + 1
-                                          ).toString()
-                                        : "";
-                                      const day = e.target.value.replace(
-                                        /[^0-9]/g,
-                                        "",
-                                      );
-                                      const date = createDateFromInputs(
-                                        year,
-                                        month,
-                                        day,
-                                      );
-                                      updateFamilyMember(
-                                        member.id,
-                                        "birthDate",
-                                        date,
-                                      );
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (
-                                        !/[0-9]/.test(e.key) &&
-                                        ![
-                                          "Backspace",
-                                          "Delete",
-                                          "ArrowLeft",
-                                          "ArrowRight",
-                                          "Tab",
-                                        ].includes(e.key)
-                                      ) {
-                                        e.preventDefault();
-                                      }
-                                    }}
-                                    min="1"
-                                    max="31"
-                                    className="text-center text-xs md:text-sm lg:text-base w-full px-1 md:px-2 lg:px-3"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* 두 번째 줄: 관계와 전화번호 */}
-                          <div className="grid grid-cols-3 gap-2 md:gap-4 lg:gap-6">
-                            <div className="space-y-2 col-span-1">
+                            <div className="space-y-2 min-w-0 flex-1">
                               <Label>
                                 관계 <span className="text-destructive">*</span>
                               </Label>
@@ -1134,20 +963,174 @@ export default function ProfileTab({
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div className="space-y-2 col-span-2">
-                              <Label>전화번호</Label>
-                              <Input
-                                value={member.phone}
-                                onChange={(e) =>
-                                  updateFamilyMember(
-                                    member.id,
-                                    "phone",
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="010-1234-5678"
-                                className="text-xs md:text-sm lg:text-base"
-                              />
+                          </div>
+
+                          {/* 두 번째 줄: 생년월일 */}
+                          <div className="space-y-2 min-w-0 overflow-hidden">
+                            <Label>생년월일</Label>
+                            <div className="flex items-center gap-0.5 md:gap-1 min-w-0">
+                              <div className="flex-1 min-w-0 max-w-[110px] md:max-w-[120px] lg:max-w-[130px]">
+                                <Input
+                                  type="number"
+                                  placeholder="년도 (예: 1990)"
+                                  value={
+                                    member.birthDate
+                                      ? member.birthDate
+                                          .getFullYear()
+                                          .toString()
+                                      : ""
+                                  }
+                                  onChange={(e) => {
+                                    const year = e.target.value.replace(
+                                      /[^0-9]/g,
+                                      "",
+                                    );
+                                    const month = member.birthDate
+                                      ? (
+                                          member.birthDate.getMonth() + 1
+                                        ).toString()
+                                      : "";
+                                    const day = member.birthDate
+                                      ? member.birthDate.getDate().toString()
+                                      : "";
+                                    const date = createDateFromInputs(
+                                      year,
+                                      month,
+                                      day,
+                                    );
+                                    updateFamilyMember(
+                                      member.id,
+                                      "birthDate",
+                                      date,
+                                    );
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (
+                                      !/[0-9]/.test(e.key) &&
+                                      ![
+                                        "Backspace",
+                                        "Delete",
+                                        "ArrowLeft",
+                                        "ArrowRight",
+                                        "Tab",
+                                      ].includes(e.key)
+                                    ) {
+                                      e.preventDefault();
+                                    }
+                                  }}
+                                  min="1900"
+                                  max="2100"
+                                  className="text-center text-xs md:text-sm lg:text-base px-2 md:px-3"
+                                />
+                              </div>
+                              <div className="min-w-0 w-10 md:w-12 lg:w-16 flex-shrink-0">
+                                <Input
+                                  type="number"
+                                  placeholder="월"
+                                  value={
+                                    member.birthDate
+                                      ? (
+                                          member.birthDate.getMonth() + 1
+                                        ).toString()
+                                      : ""
+                                  }
+                                  onChange={(e) => {
+                                    const year = member.birthDate
+                                      ? member.birthDate
+                                          .getFullYear()
+                                          .toString()
+                                      : "";
+                                    const month = e.target.value.replace(
+                                      /[^0-9]/g,
+                                      "",
+                                    );
+                                    const day = member.birthDate
+                                      ? member.birthDate.getDate().toString()
+                                      : "";
+                                    const date = createDateFromInputs(
+                                      year,
+                                      month,
+                                      day,
+                                    );
+                                    updateFamilyMember(
+                                      member.id,
+                                      "birthDate",
+                                      date,
+                                    );
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (
+                                      !/[0-9]/.test(e.key) &&
+                                      ![
+                                        "Backspace",
+                                        "Delete",
+                                        "ArrowLeft",
+                                        "ArrowRight",
+                                        "Tab",
+                                      ].includes(e.key)
+                                    ) {
+                                      e.preventDefault();
+                                    }
+                                  }}
+                                  min="1"
+                                  max="12"
+                                  className="text-center text-xs md:text-sm lg:text-base w-full px-1 md:px-2 lg:px-3"
+                                />
+                              </div>
+                              <div className="min-w-0 w-10 md:w-12 lg:w-16 flex-shrink-0">
+                                <Input
+                                  type="number"
+                                  placeholder="일"
+                                  value={
+                                    member.birthDate
+                                      ? member.birthDate.getDate().toString()
+                                      : ""
+                                  }
+                                  onChange={(e) => {
+                                    const year = member.birthDate
+                                      ? member.birthDate
+                                          .getFullYear()
+                                          .toString()
+                                      : "";
+                                    const month = member.birthDate
+                                      ? (
+                                          member.birthDate.getMonth() + 1
+                                        ).toString()
+                                      : "";
+                                    const day = e.target.value.replace(
+                                      /[^0-9]/g,
+                                      "",
+                                    );
+                                    const date = createDateFromInputs(
+                                      year,
+                                      month,
+                                      day,
+                                    );
+                                    updateFamilyMember(
+                                      member.id,
+                                      "birthDate",
+                                      date,
+                                    );
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (
+                                      !/[0-9]/.test(e.key) &&
+                                      ![
+                                        "Backspace",
+                                        "Delete",
+                                        "ArrowLeft",
+                                        "ArrowRight",
+                                        "Tab",
+                                      ].includes(e.key)
+                                    ) {
+                                      e.preventDefault();
+                                    }
+                                  }}
+                                  min="1"
+                                  max="31"
+                                  className="text-center text-xs md:text-sm lg:text-base w-full px-1 md:px-2 lg:px-3"
+                                />
+                              </div>
                             </div>
                           </div>
 
@@ -1221,7 +1204,24 @@ export default function ProfileTab({
                             </div>
                           </div>
 
-                          {/* 네 번째 줄: 메모 */}
+                          {/* 네 번째 줄: 전화번호 */}
+                          <div className="space-y-2">
+                            <Label>전화번호</Label>
+                            <Input
+                              value={member.phone}
+                              onChange={(e) =>
+                                updateFamilyMember(
+                                  member.id,
+                                  "phone",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="010-1234-5678"
+                              className="text-xs md:text-sm lg:text-base"
+                            />
+                          </div>
+
+                          {/* 다섯 번째 줄: 메모 */}
                           <div className="space-y-2">
                             <Label>메모</Label>
                             <Input
