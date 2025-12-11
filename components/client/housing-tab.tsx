@@ -242,21 +242,23 @@ export default function HousingTab({ initialData, onSave }: HousingTabProps) {
             </Label>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="hasWasherDryer"
-              checked={formData.hasWasherDryer}
-              onCheckedChange={(checked) =>
-                setFormData({ ...formData, hasWasherDryer: checked === true })
-              }
-            />
-            <Label
-              htmlFor="hasWasherDryer"
-              className="font-normal cursor-pointer"
-            >
-              세탁기/건조기
-            </Label>
-            <span className="text-xs text-muted-foreground ml-2 whitespace-nowrap">
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="hasWasherDryer"
+                checked={formData.hasWasherDryer}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, hasWasherDryer: checked === true })
+                }
+              />
+              <Label
+                htmlFor="hasWasherDryer"
+                className="font-normal cursor-pointer whitespace-nowrap"
+              >
+                세탁기/건조기
+              </Label>
+            </div>
+            <span className="text-xs text-muted-foreground ml-6 mt-1">
               세탁기와 건조기가 있는 집은 시세보다 비쌀 수도 있습니다
             </span>
           </div>
