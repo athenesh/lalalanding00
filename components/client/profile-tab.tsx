@@ -915,9 +915,9 @@ export default function ProfileTab({
                       <CardContent>
                         <div className="space-y-6">
                           {/* 첫 번째 줄: 이름과 관계 */}
-                          <div className="flex flex-row gap-2 md:gap-4 lg:gap-6 items-end">
+                          <div className="flex flex-row gap-2 md:gap-4 lg:gap-6">
                             <div className="space-y-2 min-w-0 flex-[1.265]">
-                              <Label>
+                              <Label className="h-5 flex items-center">
                                 이름 <span className="text-destructive">*</span>
                               </Label>
                               <Input
@@ -931,11 +931,11 @@ export default function ProfileTab({
                                 }
                                 placeholder="영문이름"
                                 required
-                                className="text-xs md:text-sm lg:text-base"
+                                className="text-xs md:text-sm lg:text-base h-9"
                               />
                             </div>
                             <div className="space-y-2 min-w-0 flex-basis-[33.333%] flex-shrink-0">
-                              <Label>
+                              <Label className="h-5 flex items-center">
                                 관계 <span className="text-destructive">*</span>
                               </Label>
                               <Select
@@ -949,7 +949,7 @@ export default function ProfileTab({
                                 }
                                 required
                               >
-                                <SelectTrigger className="w-full">
+                                <SelectTrigger className="w-full h-9">
                                   <SelectValue placeholder="관계 선택" />
                                 </SelectTrigger>
                                 <SelectContent>
