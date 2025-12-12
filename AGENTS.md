@@ -193,6 +193,10 @@ GEMINI_API_KEY=
 NEXT_PUBLIC_CHAT_POLLING_INTERVAL=5000
 NEXT_PUBLIC_CHAT_MAX_RETRY_COUNT=5
 NEXT_PUBLIC_CHAT_BACKOFF_MULTIPLIER=2
+
+# Maintenance Mode (서비스 점검 모드)
+# true 또는 1로 설정 시 모든 사용자를 /maintenance 페이지로 리다이렉트
+MAINTENANCE_MODE=false
 ```
 
 ## Development Guidelines
