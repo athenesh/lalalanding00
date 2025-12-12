@@ -6,6 +6,18 @@ import { useUser } from "@clerk/nextjs";
 import Header from "@/components/layout/header";
 import ClientCard from "@/components/agent/client-card";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Copy, Link as LinkIcon } from "lucide-react";
 
 interface Client {
   id: string;
@@ -36,6 +48,10 @@ export default function AgentDashboard() {
   >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingUnassigned, setIsLoadingUnassigned] = useState(true);
+  const [isInvitationDialogOpen, setIsInvitationDialogOpen] = useState(false);
+  const [invitationEmail, setInvitationEmail] = useState("");
+  const [isCreatingInvitation, setIsCreatingInvitation] = useState(false);
+  const [generatedInvitationLink, setGeneratedInvitationLink] = useState("");
   const { toast } = useToast();
   const router = useRouter();
   const { user, isLoaded: userLoaded } = useUser();
@@ -235,11 +251,181 @@ export default function AgentDashboard() {
     );
   }, [user, userLoaded]);
 
+  // 초대 링크 생성 핸들러
+  const handleCreateInvitation = async () => {
+    try {
+      setIsCreatingInvitation(true);
+      console.log("[AgentDashboard] Creating invitation:", {
+        email: invitationEmail || null,
+      });
+
+      const response = await fetch("/api/invitations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: invitationEmail || undefined,
+          expiresInDays: 30,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create invitation");
+      }
+
+      const { invitation } = await response.json();
+      setGeneratedInvitationLink(invitation.link);
+
+      toast({
+        title: "초대 링크 생성 완료",
+        description: "초대 링크가 생성되었습니다. 클라이언트에게 공유하세요.",
+      });
+    } catch (error) {
+      console.error("[AgentDashboard] Error creating invitation:", error);
+      toast({
+        title: "초대 링크 생성 실패",
+        description:
+          error instanceof Error
+            ? error.message
+            : "초대 링크 생성에 실패했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingInvitation(false);
+    }
+  };
+
+  // 초대 링크 복사 핸들러
+  const handleCopyInvitationLink = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedInvitationLink);
+      toast({
+        title: "복사 완료",
+        description: "초대 링크가 클립보드에 복사되었습니다.",
+      });
+    } catch (error) {
+      console.error("[AgentDashboard] Error copying link:", error);
+      toast({
+        title: "복사 실패",
+        description: "링크 복사에 실패했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // 다이얼로그 닫기 핸들러
+  const handleCloseDialog = () => {
+    setIsInvitationDialogOpen(false);
+    setInvitationEmail("");
+    setGeneratedInvitationLink("");
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header title="내 클라이언트 관리" userName={displayName} />
 
       <main className="container mx-auto px-4 py-8">
+        {/* 초대 링크 생성 섹션 */}
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold">클라이언트 초대</h2>
+            <p className="text-muted-foreground mt-1">
+              새로운 클라이언트를 초대하여 서비스를 이용하도록 할 수 있습니다
+            </p>
+          </div>
+          <Dialog open={isInvitationDialogOpen} onOpenChange={setIsInvitationDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <LinkIcon className="mr-2 h-4 w-4" />
+                초대 링크 생성
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>클라이언트 초대 링크 생성</DialogTitle>
+                <DialogDescription>
+                  초대 링크를 생성하여 클라이언트에게 공유하세요. 링크는 30일간
+                  유효합니다.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                {!generatedInvitationLink ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">
+                        이메일 (선택사항)
+                      </Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="client@example.com"
+                        value={invitationEmail}
+                        onChange={(e) => setInvitationEmail(e.target.value)}
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        특정 이메일로 초대하는 경우 입력하세요. 비워두면 누구나
+                        사용할 수 있는 링크가 생성됩니다.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={handleCreateInvitation}
+                      disabled={isCreatingInvitation}
+                      className="w-full"
+                    >
+                      {isCreatingInvitation
+                        ? "생성 중..."
+                        : "초대 링크 생성"}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label>생성된 초대 링크</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={generatedInvitationLink}
+                          readOnly
+                          className="font-mono text-sm"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={handleCopyInvitationLink}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        링크를 복사하여 클라이언트에게 공유하세요.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={handleCloseDialog}
+                        className="flex-1"
+                      >
+                        닫기
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setGeneratedInvitationLink("");
+                          setInvitationEmail("");
+                        }}
+                        className="flex-1"
+                      >
+                        새 링크 생성
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+
         {/* 내 클라이언트 섹션 */}
         <div className="mb-12">
           <div className="mb-6">

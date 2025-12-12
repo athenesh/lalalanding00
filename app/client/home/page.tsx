@@ -7,13 +7,14 @@ import Header from "@/components/layout/header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Calendar } from "lucide-react";
+import { Calendar, Lock } from "lucide-react";
 import ProfileTab from "@/components/client/profile-tab";
 import HousingTab from "@/components/client/housing-tab";
 import ChecklistTab from "@/components/client/checklist-tab";
 import ChatTab from "@/components/client/chat-tab";
 import { useToast } from "@/hooks/use-toast";
 import { TimelinePhase } from "@/types/checklist";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function ClientHomePage() {
   const { userId, isLoaded: authLoaded } = useAuth();
@@ -29,6 +30,7 @@ export default function ClientHomePage() {
   const [profileData, setProfileData] = useState<any>(null);
   const [housingData, setHousingData] = useState<any>(null);
   const [checklistData, setChecklistData] = useState<any[]>([]);
+  const [accessLevel, setAccessLevel] = useState<"invited" | "paid">("invited");
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingHousing, setIsLoadingHousing] = useState(false);
   const [isLoadingChecklist, setIsLoadingChecklist] = useState(false);
@@ -121,6 +123,9 @@ export default function ClientHomePage() {
       const client = data.client;
       const familyMembers = data.familyMembers || [];
       const emergencyContacts = data.emergencyContacts || [];
+
+      // access_level 설정
+      setAccessLevel(client.access_level || "invited");
 
       // 클라이언트 데이터 설정
       // 체크리스트 완료율은 loadChecklistData에서 계산
@@ -748,8 +753,26 @@ export default function ClientHomePage() {
           <Tabs defaultValue="profile" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="profile">내 프로필</TabsTrigger>
-              <TabsTrigger value="housing">주거옵션</TabsTrigger>
-              <TabsTrigger value="checklist">체크리스트</TabsTrigger>
+              <TabsTrigger
+                value="housing"
+                disabled={accessLevel === "invited"}
+                className={accessLevel === "invited" ? "opacity-50" : ""}
+              >
+                주거옵션
+                {accessLevel === "invited" && (
+                  <Lock className="ml-1 h-3 w-3" />
+                )}
+              </TabsTrigger>
+              <TabsTrigger
+                value="checklist"
+                disabled={accessLevel === "invited"}
+                className={accessLevel === "invited" ? "opacity-50" : ""}
+              >
+                체크리스트
+                {accessLevel === "invited" && (
+                  <Lock className="ml-1 h-3 w-3" />
+                )}
+              </TabsTrigger>
               <TabsTrigger value="chat">채팅</TabsTrigger>
             </TabsList>
 
@@ -771,32 +794,54 @@ export default function ClientHomePage() {
               </TabsContent>
 
               <TabsContent value="housing" className="space-y-6">
-                <div className="bg-card rounded-lg border border-border p-6">
-                  <h2 className="text-xl font-semibold mb-6">주거 옵션</h2>
-                  {isLoadingHousing ? (
-                    <div className="text-center py-8">
-                      <p className="text-muted-foreground">
-                        주거옵션 정보를 불러오는 중...
-                      </p>
-                    </div>
-                  ) : (
-                    <HousingTab
-                      initialData={housingData}
-                      onSave={handleSaveHousing}
-                    />
-                  )}
-                </div>
+                {accessLevel === "invited" ? (
+                  <Alert>
+                    <Lock className="h-4 w-4" />
+                    <AlertTitle>결제가 필요합니다</AlertTitle>
+                    <AlertDescription>
+                      주거옵션 기능을 이용하시려면 결제를 완료해주세요. (Phase 2에서
+                      구현 예정)
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <div className="bg-card rounded-lg border border-border p-6">
+                    <h2 className="text-xl font-semibold mb-6">주거 옵션</h2>
+                    {isLoadingHousing ? (
+                      <div className="text-center py-8">
+                        <p className="text-muted-foreground">
+                          주거옵션 정보를 불러오는 중...
+                        </p>
+                      </div>
+                    ) : (
+                      <HousingTab
+                        initialData={housingData}
+                        onSave={handleSaveHousing}
+                      />
+                    )}
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="checklist" className="space-y-6">
-                <ChecklistTab
-                  movingDate={clientData.movingDate}
-                  initialData={
-                    checklistData.length > 0 ? checklistData : undefined
-                  }
-                  onSave={handleSaveChecklist}
-                  isLoading={isLoadingChecklist}
-                />
+                {accessLevel === "invited" ? (
+                  <Alert>
+                    <Lock className="h-4 w-4" />
+                    <AlertTitle>결제가 필요합니다</AlertTitle>
+                    <AlertDescription>
+                      체크리스트 기능을 이용하시려면 결제를 완료해주세요. (Phase 2에서
+                      구현 예정)
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <ChecklistTab
+                    movingDate={clientData.movingDate}
+                    initialData={
+                      checklistData.length > 0 ? checklistData : undefined
+                    }
+                    onSave={handleSaveChecklist}
+                    isLoading={isLoadingChecklist}
+                  />
+                )}
               </TabsContent>
 
               <TabsContent value="chat" className="space-y-6">

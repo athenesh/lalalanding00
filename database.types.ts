@@ -354,48 +354,98 @@ export type Database = {
           },
         ]
       }
+      client_invitations: {
+        Row: {
+          id: string
+          agent_id: string
+          invitation_token: string
+          email: string | null
+          expires_at: string
+          used_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          agent_id: string
+          invitation_token: string
+          email?: string | null
+          expires_at: string
+          used_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          agent_id?: string
+          invitation_token?: string
+          email?: string | null
+          expires_at?: string
+          used_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_invitations_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
+          access_level: string | null
           birth_date: string | null
           clerk_user_id: string | null
           created_at: string | null
           email: string | null
           id: string
+          invitation_token: string | null
           moving_date: string | null
           moving_type: string | null
           name: string
           occupation: string | null
           owner_agent_id: string | null
+          payment_completed_at: string | null
+          payment_status: string | null
           phone_kr: string | null
           phone_us: string | null
           relocation_type: string | null
         }
         Insert: {
+          access_level?: string | null
           birth_date?: string | null
           clerk_user_id?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
+          invitation_token?: string | null
           moving_date?: string | null
           moving_type?: string | null
           name: string
           occupation?: string | null
           owner_agent_id?: string | null
+          payment_completed_at?: string | null
+          payment_status?: string | null
           phone_kr?: string | null
           phone_us?: string | null
           relocation_type?: string | null
         }
         Update: {
+          access_level?: string | null
           birth_date?: string | null
           clerk_user_id?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
+          invitation_token?: string | null
           moving_date?: string | null
           moving_type?: string | null
           name?: string
           occupation?: string | null
           owner_agent_id?: string | null
+          payment_completed_at?: string | null
+          payment_status?: string | null
           phone_kr?: string | null
           phone_us?: string | null
           relocation_type?: string | null

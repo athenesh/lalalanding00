@@ -86,7 +86,10 @@ export async function GET() {
     });
 
     return NextResponse.json({
-      client,
+      client: {
+        ...client,
+        access_level: client.access_level || "invited", // 기본값은 invited
+      },
       familyMembers: familyMembers || [],
       emergencyContacts: emergencyContacts || [],
     });

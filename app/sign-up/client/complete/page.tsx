@@ -69,9 +69,21 @@ export default function ClientSignUpCompletePage() {
         }
 
         // 역할 설정 후 클라이언트 레코드 자동 생성
-        console.log("Creating client record...");
+        // URL에서 초대 토큰 가져오기
+        const urlParams = new URLSearchParams(window.location.search);
+        const invitationToken = urlParams.get("token");
+
+        console.log("Creating client record...", {
+          invitationToken: invitationToken || null,
+        });
         const createClientResponse = await fetch("/api/clients/auto-create", {
           method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            invitationToken: invitationToken || null,
+          }),
         });
 
         if (!createClientResponse.ok) {
