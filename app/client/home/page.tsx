@@ -110,7 +110,11 @@ export default function ClientHomePage() {
       const response = await fetch("/api/client/profile");
       if (!response.ok) {
         if (response.status === 404) {
-          console.log("[ClientHomePage] 프로필이 아직 생성되지 않음");
+          console.log(
+            "[ClientHomePage] 클라이언트가 없음 - 초대링크 없이 가입한 유저로 간주",
+          );
+          // 초대링크 없이 가입한 유저로 간주하고 accessLevel을 invited로 설정
+          setAccessLevel("invited");
           setIsLoading(false);
           return;
         }
@@ -173,11 +177,8 @@ export default function ClientHomePage() {
       });
     } catch (error) {
       console.error("[ClientHomePage] 프로필 데이터 로드 실패:", error);
-      toast({
-        title: "데이터 로드 실패",
-        description: "프로필 정보를 불러오는데 실패했습니다.",
-        variant: "destructive",
-      });
+      // 에러 토스트는 표시하지 않음 (초대링크 없이 가입한 유저는 정상적인 상황)
+      setIsLoading(false);
     } finally {
       setIsLoading(false);
     }
@@ -191,7 +192,9 @@ export default function ClientHomePage() {
       const response = await fetch("/api/client/housing");
       if (!response.ok) {
         if (response.status === 404) {
-          console.log("[ClientHomePage] 주거옵션이 아직 생성되지 않음");
+          console.log(
+            "[ClientHomePage] 클라이언트가 없음 - 초대링크 없이 가입한 유저로 간주",
+          );
           setHousingData(null);
           setIsLoadingHousing(false);
           return;
@@ -250,12 +253,9 @@ export default function ClientHomePage() {
       console.log("[ClientHomePage] 주거옵션 데이터 로드 성공");
     } catch (error) {
       console.error("[ClientHomePage] 주거옵션 데이터 로드 실패:", error);
-      toast({
-        title: "데이터 로드 실패",
-        description: "주거옵션 정보를 불러오는데 실패했습니다.",
-        variant: "destructive",
-      });
+      // 에러 토스트는 표시하지 않음
       setHousingData(null);
+      setIsLoadingHousing(false);
     } finally {
       setIsLoadingHousing(false);
     }
@@ -269,7 +269,9 @@ export default function ClientHomePage() {
       const response = await fetch("/api/client/checklist");
       if (!response.ok) {
         if (response.status === 404) {
-          console.log("[ClientHomePage] 체크리스트가 아직 생성되지 않음");
+          console.log(
+            "[ClientHomePage] 클라이언트가 없음 - 초대링크 없이 가입한 유저로 간주",
+          );
           setChecklistData([]);
           setIsLoadingChecklist(false);
           return;
@@ -321,12 +323,9 @@ export default function ClientHomePage() {
       });
     } catch (error) {
       console.error("[ClientHomePage] 체크리스트 데이터 로드 실패:", error);
-      toast({
-        title: "데이터 로드 실패",
-        description: "체크리스트 정보를 불러오는데 실패했습니다.",
-        variant: "destructive",
-      });
+      // 에러 토스트는 표시하지 않음
       setChecklistData([]);
+      setIsLoadingChecklist(false);
     } finally {
       setIsLoadingChecklist(false);
     }
@@ -344,7 +343,7 @@ export default function ClientHomePage() {
         items.map((item: any) => [
           item.templateId,
           item.memo || "", // 전송한 메모 저장
-        ])
+        ]),
       );
 
       // ChecklistItem을 DB 업데이트 형식으로 변환
@@ -411,21 +410,22 @@ export default function ClientHomePage() {
             const serverItem = updatedMap.get(item.templateId) as any;
             if (serverItem) {
               // 서버에서 받은 데이터로 부분 업데이트
-              const serverMemo = serverItem.notes !== null && serverItem.notes !== undefined 
-                ? serverItem.notes 
-                : "";
-              
+              const serverMemo =
+                serverItem.notes !== null && serverItem.notes !== undefined
+                  ? serverItem.notes
+                  : "";
+
               // 저장할 때 전송한 메모와 서버 응답 메모 비교
               const sentMemo = sentMemos.get(item.templateId) || "";
-              
+
               // 전송한 메모와 서버 응답 메모가 같으면 서버 메모 사용 (정상 동기화)
               // 다르면 현재 로컬 메모 유지 (사용자가 입력 중일 수 있음)
               // 또는 전송한 메모와 현재 로컬 메모가 다르면 현재 로컬 메모 유지 (새로 입력 중)
-              const finalMemo = 
+              const finalMemo =
                 sentMemo === serverMemo && item.memo === sentMemo
                   ? serverMemo // 정상 동기화: 전송=서버=로컬
                   : item.memo; // 사용자가 입력 중: 현재 로컬 메모 유지
-              
+
               return {
                 ...item,
                 id: serverItem.id || item.id, // 새로 생성된 경우 id 업데이트
@@ -759,9 +759,7 @@ export default function ClientHomePage() {
                 className={accessLevel === "invited" ? "opacity-50" : ""}
               >
                 주거옵션
-                {accessLevel === "invited" && (
-                  <Lock className="ml-1 h-3 w-3" />
-                )}
+                {accessLevel === "invited" && <Lock className="ml-1 h-3 w-3" />}
               </TabsTrigger>
               <TabsTrigger
                 value="checklist"
@@ -769,9 +767,7 @@ export default function ClientHomePage() {
                 className={accessLevel === "invited" ? "opacity-50" : ""}
               >
                 체크리스트
-                {accessLevel === "invited" && (
-                  <Lock className="ml-1 h-3 w-3" />
-                )}
+                {accessLevel === "invited" && <Lock className="ml-1 h-3 w-3" />}
               </TabsTrigger>
               <TabsTrigger value="chat">채팅</TabsTrigger>
             </TabsList>
@@ -797,10 +793,10 @@ export default function ClientHomePage() {
                 {accessLevel === "invited" ? (
                   <Alert>
                     <Lock className="h-4 w-4" />
-                    <AlertTitle>결제가 필요합니다</AlertTitle>
+                    <AlertTitle>초대링크가 필요합니다</AlertTitle>
                     <AlertDescription>
-                      주거옵션 기능을 이용하시려면 결제를 완료해주세요. (Phase 2에서
-                      구현 예정)
+                      주거옵션 기능을 이용하시려면 에이전트의 초대링크를 통해
+                      가입해주세요.
                     </AlertDescription>
                   </Alert>
                 ) : (
@@ -826,10 +822,10 @@ export default function ClientHomePage() {
                 {accessLevel === "invited" ? (
                   <Alert>
                     <Lock className="h-4 w-4" />
-                    <AlertTitle>결제가 필요합니다</AlertTitle>
+                    <AlertTitle>초대링크가 필요합니다</AlertTitle>
                     <AlertDescription>
-                      체크리스트 기능을 이용하시려면 결제를 완료해주세요. (Phase 2에서
-                      구현 예정)
+                      체크리스트 기능을 이용하시려면 에이전트의 초대링크를 통해
+                      가입해주세요.
                     </AlertDescription>
                   </Alert>
                 ) : (

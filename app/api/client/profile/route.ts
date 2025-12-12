@@ -126,7 +126,14 @@ export async function PATCH(request: Request) {
 
     if (!clientId) {
       console.log("[API] 클라이언트 또는 권한 부여된 사용자가 아님");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        {
+          error: "Client not found",
+          message:
+            "초대링크를 통해 가입한 클라이언트 또는 결제한 클라이언트만 접근 가능합니다.",
+        },
+        { status: 404 }, // 401 대신 404 반환
+      );
     }
 
     // 클라이언트 정보 조회 (client_id로)
