@@ -4,9 +4,10 @@ import { NextResponse } from "next/server";
 // 공개 라우트 정의
 const isPublicRoute = createRouteMatcher([
   "/",
+  "/maintenance", // Maintenance 페이지 추가
   "/sign-in(.*)",
-  "/sign-up(.*)", // /sign-up/agent, /sign-up/client, /sign-up/agent/complete, /sign-up/client/complete 포함
-  "/select-role", // 기존 경로 호환성을 위해 유지 (실제로는 랜딩 페이지로 리다이렉트)
+  "/sign-up(.*)",
+  "/select-role",
 ]);
 
 export default clerkMiddleware(
@@ -35,19 +36,19 @@ export default clerkMiddleware(
         (process.env.MAINTENANCE_MODE === "true" ||
           process.env.MAINTENANCE_MODE === "1");
 
-      if (maintenanceMode && pathname !== "/maintenance") {
-        // Maintenance 페이지 자체는 허용, 나머지는 모두 리다이렉트
+      if (maintenanceMode) {
+        // Maintenance 페이지로의 접근만 허용
+        if (pathname === "/maintenance") {
+          return NextResponse.next();
+        }
+        // 나머지 모든 경로는 maintenance 페이지로 리다이렉트
         console.log(
           "[Middleware] Maintenance mode active, redirecting to /maintenance",
         );
         return NextResponse.redirect(new URL("/maintenance", req.url));
       }
 
-      // Maintenance mode가 활성화되어 있으면 여기서 종료 (maintenance 페이지만 허용)
-      if (maintenanceMode) {
-        return NextResponse.next();
-      }
-
+      // Maintenance mode가 아닐 때만 인증 로직 실행
       const { userId, sessionClaims } = await auth();
       const role = (sessionClaims?.publicMetadata as { role?: string })?.role;
 
