@@ -30,11 +30,21 @@ export default clerkMiddleware(
 
       // Maintenance mode 체크 (가장 우선순위)
       // 프로덕션 환경에서만 maintenance mode 활성화
+      // Vercel에서는 NODE_ENV가 자동으로 "production"으로 설정됨
       const isProduction = process.env.NODE_ENV === "production";
       const maintenanceMode =
         isProduction &&
         (process.env.MAINTENANCE_MODE === "true" ||
           process.env.MAINTENANCE_MODE === "1");
+
+      // 디버깅: 환경 변수 로그 (프로덕션에서만)
+      if (isProduction) {
+        console.log("[Middleware] Environment check:", {
+          NODE_ENV: process.env.NODE_ENV,
+          MAINTENANCE_MODE: process.env.MAINTENANCE_MODE,
+          maintenanceMode,
+        });
+      }
 
       if (maintenanceMode) {
         // Maintenance 페이지로의 접근만 허용
