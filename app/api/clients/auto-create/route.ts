@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { getAuthRole } from "@/lib/auth";
+import { getAuthRole, isAgentApproved } from "@/lib/auth";
 import { createClerkSupabaseClient } from "@/lib/supabase/server";
 import { clerkClient } from "@clerk/nextjs/server";
 
@@ -116,6 +116,26 @@ export async function POST(request: Request) {
       ownerAgentId = invitation.agent_id;
       usedInvitationToken = invitation.invitation_token;
       console.log("[API] Invitation validated, agent ID:", ownerAgentId);
+
+      // 에이전트 승인 상태 확인
+      const isApproved = await isAgentApproved(ownerAgentId);
+      if (!isApproved) {
+        console.warn("[API] Unapproved agent's invitation token used:", {
+          agentId: ownerAgentId,
+          invitationToken,
+        });
+        return NextResponse.json(
+          {
+            error: "이 초대 코드는 승인되지 않은 에이전트가 생성한 코드입니다.",
+          },
+          { status: 400 }
+        );
+      }
+
+      console.log("[API] Agent approval check for invitation token:", {
+        agentId: ownerAgentId,
+        isApproved: true,
+      });
     } else if (invitationCode) {
       console.log("[API] Validating invitation code:", invitationCode);
       
@@ -152,6 +172,26 @@ export async function POST(request: Request) {
       ownerAgentId = invitation.agent_id;
       usedInvitationToken = invitation.invitation_token;
       console.log("[API] Invitation code validated, agent ID:", ownerAgentId);
+
+      // 에이전트 승인 상태 확인
+      const isApproved = await isAgentApproved(ownerAgentId);
+      if (!isApproved) {
+        console.warn("[API] Unapproved agent's invitation code used:", {
+          agentId: ownerAgentId,
+          invitationCode,
+        });
+        return NextResponse.json(
+          {
+            error: "이 초대 코드는 승인되지 않은 에이전트가 생성한 코드입니다.",
+          },
+          { status: 400 }
+        );
+      }
+
+      console.log("[API] Agent approval check for invitation code:", {
+        agentId: ownerAgentId,
+        isApproved: true,
+      });
     }
 
     // 이미 레코드가 있으면 반환

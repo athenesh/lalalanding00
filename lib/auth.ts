@@ -485,14 +485,102 @@ export async function isAdmin(): Promise<boolean> {
   const user = await getAuthUser();
 
   if (!user) {
+    console.log("[Auth] isAdmin: 사용자 정보 없음");
     return false;
   }
 
   const adminEmail = process.env.ADMIN_EMAIL;
   if (!adminEmail) {
+    console.error("[Auth] isAdmin: ADMIN_EMAIL 환경 변수가 설정되지 않았습니다.");
     return false;
   }
 
   const userEmail = user.emailAddresses[0]?.emailAddress;
-  return userEmail?.toLowerCase() === adminEmail.toLowerCase();
+  if (!userEmail) {
+    console.log("[Auth] isAdmin: 사용자 이메일 주소 없음");
+    return false;
+  }
+
+  const isAdminUser = userEmail.toLowerCase() === adminEmail.toLowerCase();
+  
+  // 개발 환경에서만 상세 로그
+  if (process.env.NODE_ENV === "development") {
+    console.log("[Auth] isAdmin 체크:", {
+      userEmail: userEmail.toLowerCase(),
+      adminEmail: adminEmail.toLowerCase(),
+      match: isAdminUser,
+    });
+  }
+  
+  return isAdminUser;
+}
+
+/**
+ * 특정 에이전트의 승인 상태를 확인합니다.
+ * @param accountId - 확인할 에이전트의 account ID
+ * @returns 승인되었으면 true, 아니면 false
+ */
+export async function isAgentApproved(
+  accountId: string,
+): Promise<boolean> {
+  const supabase = createClerkSupabaseClient();
+  const serviceSupabase = getServiceRoleClient();
+
+  // Service Role로 조회하여 RLS 우회
+  const { data: account, error } = await serviceSupabase
+    .from("accounts")
+    .select("is_approved")
+    .eq("id", accountId)
+    .eq("role", "agent")
+    .single();
+
+  if (error || !account) {
+    console.log("[Auth] isAgentApproved: 에이전트를 찾을 수 없음:", {
+      accountId,
+      error: error?.message,
+    });
+    return false;
+  }
+
+  console.log("[Auth] Agent approval check:", {
+    accountId,
+    isApproved: account.is_approved,
+  });
+
+  return account.is_approved === true;
+}
+
+/**
+ * 현재 사용자가 승인된 에이전트인지 확인합니다.
+ * API 라우트에서 사용합니다.
+ * @returns 승인된 에이전트이면 true, 아니면 false
+ */
+export async function requireApprovedAgent(): Promise<boolean> {
+  // 1. 에이전트 역할 확인
+  const role = await getAuthRole();
+  if (role !== "agent") {
+    console.log("[Auth] requireApprovedAgent: 에이전트 역할이 아님:", {
+      role,
+    });
+    return false;
+  }
+
+  // 2. Account 조회 또는 생성
+  const account = await getOrCreateAccount();
+
+  // 3. 승인 상태 확인
+  const isApproved = await isAgentApproved(account.id);
+
+  if (!isApproved) {
+    console.warn("[Auth] requireApprovedAgent: 승인되지 않은 에이전트:", {
+      accountId: account.id,
+    });
+    return false;
+  }
+
+  console.log("[Auth] requireApprovedAgent: 승인된 에이전트 확인:", {
+    accountId: account.id,
+  });
+
+  return true;
 }

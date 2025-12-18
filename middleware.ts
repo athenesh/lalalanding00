@@ -1,4 +1,8 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import {
+  clerkMiddleware,
+  createRouteMatcher,
+  clerkClient,
+} from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 // 공개 라우트 정의
@@ -75,6 +79,26 @@ export default clerkMiddleware(
       const { userId, sessionClaims } = await auth();
       const role = (sessionClaims?.publicMetadata as { role?: string })?.role;
 
+      // 🔥 관리자 체크 (role과 관계없이 우선 확인)
+      let isAdminUser = false;
+      if (userId) {
+        try {
+          const adminEmail = process.env.ADMIN_EMAIL;
+          if (adminEmail) {
+            const client = await clerkClient();
+            const user = await client.users.getUser(userId);
+            const userEmail = user.emailAddresses[0]?.emailAddress;
+            if (userEmail?.toLowerCase() === adminEmail.toLowerCase()) {
+              isAdminUser = true;
+              console.log("[Middleware] 관리자 확인됨:", userEmail);
+            }
+          }
+        } catch (error) {
+          // 관리자 체크 실패 시 무시 (성능을 위해 에러 로그만)
+          console.error("[Middleware] 관리자 체크 중 오류:", error);
+        }
+      }
+
       // 로그인한 사용자가 공개 라우트에 접근하는 경우
       if (userId && isPublicRoute(req)) {
         // 회원가입 완료 페이지는 역할 설정 중이므로 리다이렉트하지 않음
@@ -88,17 +112,17 @@ export default clerkMiddleware(
         // 루트 경로나 로그인/회원가입 페이지 접근 시 역할에 따라 리다이렉트
         // 단, 역할이 없으면 리다이렉트하지 않음 (회원가입 진행 중일 수 있음)
         // 에이전트는 승인 상태를 확인해야 하므로 클라이언트 사이드에서 처리
+        // 🔥 관리자는 role과 관계없이 리다이렉트하지 않음 (홈 페이지에서 처리)
         if (
           pathname === "/" ||
           pathname.startsWith("/sign-in") ||
           pathname.startsWith("/sign-up")
         ) {
-          // 에이전트는 홈 페이지에서 승인 상태를 확인하도록 허용 (클라이언트 사이드 처리)
-          // 클라이언트는 바로 홈으로 리다이렉트
-          if (role === "client") {
+          // 관리자가 아닌 경우에만 role 기반 리다이렉트
+          if (!isAdminUser && role === "client") {
             return NextResponse.redirect(new URL("/client/home", req.url));
           }
-          // 역할이 없으면 그대로 진행 (회원가입 진행 중일 수 있음)
+          // 관리자이거나 역할이 없으면 그대로 진행 (홈 페이지에서 관리자 체크 수행)
         }
       }
 

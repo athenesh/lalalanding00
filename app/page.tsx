@@ -43,93 +43,129 @@ export default function Home() {
   useEffect(() => {
     if (!authLoaded || !userLoaded || hasRedirected.current) return;
 
-    // role이 있는 경우
-    if (role === "agent") {
-      hasRedirected.current = true;
-      
-      // 에이전트 승인 상태 확인
-      const checkAgentApproval = async () => {
-        try {
-          const response = await fetch("/api/agent/status");
-          if (response.ok) {
-            const data = await response.json();
-            if (data.isApproved) {
-              console.log("[HomePage] Agent approved, redirecting to dashboard");
-              window.location.href = "/agent/dashboard";
-            } else {
-              console.log("[HomePage] Agent not approved, redirecting to complete page");
-              window.location.href = "/sign-up/agent/complete";
-            }
-          } else {
-            // API 호출 실패 시 complete 페이지로 (정보 미입력 가능성)
-            console.log("[HomePage] Failed to check approval status, redirecting to complete page");
-            window.location.href = "/sign-up/agent/complete";
-          }
-        } catch (error) {
-          console.error("[HomePage] Error checking agent approval:", error);
-          window.location.href = "/sign-up/agent/complete";
-        }
-      };
-      
-      checkAgentApproval();
-      return;
-    }
-
-    if (role === "client") {
-      hasRedirected.current = true;
-      console.log("[HomePage] Redirecting client to home (one-time)");
-      window.location.href = "/client/home";
-      return;
-    }
-
-    // role이 없지만 로그인한 경우 관리자 여부 및 권한 부여 상태 확인
-    if (!role && userId && !isCheckingAuthorization.current) {
+    // 🔥 우선순위 1: 관리자 체크 (role과 관계없이 먼저 확인)
+    // 관리자는 role이 없거나 다른 role이어도 관리자 대시보드로 리다이렉트
+    if (userId && !isCheckingAuthorization.current) {
       isCheckingAuthorization.current = true;
       
-      // 관리자 여부 및 권한 부여 상태 확인 함수
-      const checkAdminAndAuthorization = async () => {
+      // 관리자 여부 확인 함수
+      const checkAdminFirst = async () => {
         try {
-          // 먼저 관리자 여부 확인
-          console.log("[HomePage] 관리자 여부 확인 시작");
+          console.log("[HomePage] 🔥 관리자 여부 우선 확인 시작");
           const adminResponse = await fetch("/api/admin/check");
           
           if (adminResponse.ok) {
             const adminData = await adminResponse.json();
+            console.log("[HomePage] 관리자 확인 응답:", adminData);
+            
             if (adminData.isAdmin) {
               hasRedirected.current = true;
-              console.log("[HomePage] 관리자 확인, /admin/dashboard로 리다이렉트");
+              console.log("[HomePage] ✅ 관리자 확인, /admin/dashboard로 리다이렉트");
               window.location.href = "/admin/dashboard";
-              return;
-            }
-          }
-          
-          // 관리자가 아니면 권한 부여 상태 확인
-          console.log("[HomePage] 권한 부여 상태 확인 시작");
-          const response = await fetch("/api/client/authorize/status");
-
-          if (response.ok) {
-            const data = await response.json();
-            if (data.hasAuthorization) {
-              hasRedirected.current = true;
-              console.log("[HomePage] 권한 부여된 사용자 확인, /client/home으로 리다이렉트");
-              window.location.href = "/client/home";
+              return true; // 관리자이면 여기서 종료
             } else {
-              console.log("[HomePage] 권한 부여 상태 없음");
+              console.log("[HomePage] 관리자가 아님:", {
+                isAdmin: adminData.isAdmin,
+                adminEmailConfigured: adminData.adminEmailConfigured,
+                adminEmail: adminData.adminEmail,
+              });
             }
-          } else if (response.status === 404) {
-            // 권한이 없음 (정상)
-            console.log("[HomePage] 권한 부여 상태 없음 (404)");
           } else {
-            console.error("[HomePage] 권한 상태 확인 실패:", response.status);
+            console.error("[HomePage] 관리자 확인 API 실패:", adminResponse.status);
+            const errorData = await adminResponse.json().catch(() => ({}));
+            console.error("[HomePage] 에러 상세:", errorData);
           }
+          return false; // 관리자가 아님
         } catch (error) {
-          console.error("[HomePage] 관리자/권한 상태 확인 중 오류:", error);
-        } finally {
-          isCheckingAuthorization.current = false;
+          console.error("[HomePage] 관리자 확인 중 오류:", error);
+          return false;
         }
       };
 
-      checkAdminAndAuthorization();
+      // 관리자 체크를 먼저 실행
+      checkAdminFirst().then((isAdmin) => {
+        // 관리자가 아니면 role 기반 리다이렉트 진행
+        if (!isAdmin) {
+          // role이 있는 경우
+          if (role === "agent") {
+            hasRedirected.current = true;
+            
+            // 에이전트 승인 상태 확인
+            const checkAgentApproval = async () => {
+              try {
+                const response = await fetch("/api/agent/status");
+                if (response.ok) {
+                  const data = await response.json();
+                  if (data.isApproved) {
+                    console.log("[HomePage] Agent approved, redirecting to dashboard");
+                    window.location.href = "/agent/dashboard";
+                  } else {
+                    console.log("[HomePage] Agent not approved, redirecting to complete page");
+                    window.location.href = "/sign-up/agent/complete";
+                  }
+                } else {
+                  // API 호출 실패 시 complete 페이지로 (정보 미입력 가능성)
+                  console.log("[HomePage] Failed to check approval status, redirecting to complete page");
+                  window.location.href = "/sign-up/agent/complete";
+                }
+              } catch (error) {
+                console.error("[HomePage] Error checking agent approval:", error);
+                window.location.href = "/sign-up/agent/complete";
+              }
+            };
+            
+            checkAgentApproval();
+            isCheckingAuthorization.current = false;
+            return;
+          }
+
+          if (role === "client") {
+            hasRedirected.current = true;
+            console.log("[HomePage] Redirecting client to home (one-time)");
+            window.location.href = "/client/home";
+            isCheckingAuthorization.current = false;
+            return;
+          }
+
+          // role이 없지만 로그인한 경우 권한 부여 상태 확인
+          if (!role) {
+            // 권한 부여 상태 확인
+            const checkAuthorization = async () => {
+              try {
+                console.log("[HomePage] 권한 부여 상태 확인 시작");
+                const response = await fetch("/api/client/authorize/status");
+
+                if (response.ok) {
+                  const data = await response.json();
+                  if (data.hasAuthorization) {
+                    hasRedirected.current = true;
+                    console.log("[HomePage] 권한 부여된 사용자 확인, /client/home으로 리다이렉트");
+                    window.location.href = "/client/home";
+                  } else {
+                    console.log("[HomePage] 권한 부여 상태 없음");
+                  }
+                } else if (response.status === 404) {
+                  // 권한이 없음 (정상)
+                  console.log("[HomePage] 권한 부여 상태 없음 (404)");
+                } else {
+                  console.error("[HomePage] 권한 상태 확인 실패:", response.status);
+                }
+              } catch (error) {
+                console.error("[HomePage] 권한 상태 확인 중 오류:", error);
+              } finally {
+                isCheckingAuthorization.current = false;
+              }
+            };
+
+            checkAuthorization();
+          } else {
+            isCheckingAuthorization.current = false;
+          }
+        } else {
+          // 관리자인 경우 이미 리다이렉트됨
+          isCheckingAuthorization.current = false;
+        }
+      });
     }
   }, [authLoaded, userLoaded, role, userId]);
 

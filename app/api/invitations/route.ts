@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAgent, getOrCreateAccount } from "@/lib/auth";
+import { requireAgent, getOrCreateAccount, requireApprovedAgent } from "@/lib/auth";
 import { createClerkSupabaseClient } from "@/lib/supabase/server";
 import { z } from "zod";
 import { randomUUID } from "crypto";
@@ -22,6 +22,25 @@ export async function POST(request: Request) {
 
     const supabase = createClerkSupabaseClient();
     const account = await getOrCreateAccount();
+
+    // 승인된 에이전트인지 확인
+    const isApproved = await requireApprovedAgent();
+    if (!isApproved) {
+      console.warn("[API] Unapproved agent attempted to create invitation:", {
+        accountId: account.id,
+      });
+      return NextResponse.json(
+        {
+          error: "승인되지 않은 에이전트는 초대 코드를 생성할 수 없습니다.",
+        },
+        { status: 403 }
+      );
+    }
+
+    console.log("[API] Agent approval check:", {
+      accountId: account.id,
+      isApproved: true,
+    });
 
     // 요청 본문 파싱
     const body = await request.json().catch(() => ({}));

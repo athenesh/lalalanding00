@@ -8,11 +8,28 @@ import { isAdmin } from "@/lib/auth";
  */
 export async function GET() {
   try {
+    console.log("[API] GET /api/admin/check 호출 시작");
+    
+    // 환경 변수 확인
+    const adminEmail = process.env.ADMIN_EMAIL;
+    console.log("[API] ADMIN_EMAIL 환경 변수:", adminEmail ? "설정됨" : "설정되지 않음");
+    
     const admin = await isAdmin();
     
-    return NextResponse.json({
+    // 디버깅을 위한 상세 정보
+    const debugInfo: any = {
       isAdmin: admin,
-    });
+      adminEmailConfigured: !!adminEmail,
+    };
+    
+    // 개발 환경에서만 상세 정보 반환
+    if (process.env.NODE_ENV === "development") {
+      debugInfo.adminEmail = adminEmail;
+    }
+    
+    console.log("[API] 관리자 확인 결과:", debugInfo);
+    
+    return NextResponse.json(debugInfo);
   } catch (error) {
     console.error("[API] Error in GET /api/admin/check:", error);
     return NextResponse.json(

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAgent, getOrCreateAccount } from "@/lib/auth";
+import { requireAgent, getOrCreateAccount, requireApprovedAgent } from "@/lib/auth";
 import { createClerkSupabaseClient } from "@/lib/supabase/server";
 import { uuidSchema } from "@/lib/validations/api-schemas";
 
@@ -35,6 +35,26 @@ export async function PATCH(
 
     // Account 조회 또는 자동 생성
     const account = await getOrCreateAccount();
+
+    // 승인된 에이전트인지 확인
+    const isApproved = await requireApprovedAgent();
+    if (!isApproved) {
+      console.warn("[API] Unapproved agent attempted to assign client:", {
+        accountId: account.id,
+        clientId: id,
+      });
+      return NextResponse.json(
+        {
+          error: "승인되지 않은 에이전트는 클라이언트를 할당받을 수 없습니다.",
+        },
+        { status: 403 }
+      );
+    }
+
+    console.log("[API] Agent approval check:", {
+      accountId: account.id,
+      isApproved: true,
+    });
 
     // 클라이언트 조회 및 할당 상태 확인
     const { data: client, error: clientError } = await supabase

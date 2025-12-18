@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, XCircle, Clock, Mail } from "lucide-react";
@@ -114,7 +120,9 @@ export default function AdminAgentsPage() {
     <div className="min-h-screen bg-background">
       <Header
         title="에이전트 관리"
-        userName={user?.fullName || user?.emailAddresses[0]?.emailAddress || "Admin"}
+        userName={
+          user?.fullName || user?.emailAddresses[0]?.emailAddress || "Admin"
+        }
       />
 
       <main className="container mx-auto px-4 py-8">
@@ -151,8 +159,8 @@ export default function AdminAgentsPage() {
                   {filter === "pending"
                     ? "승인 대기 중인 에이전트가 없습니다."
                     : filter === "approved"
-                      ? "승인된 에이전트가 없습니다."
-                      : "에이전트가 없습니다."}
+                    ? "승인된 에이전트가 없습니다."
+                    : "에이전트가 없습니다."}
                 </p>
               </div>
             ) : (
@@ -165,19 +173,13 @@ export default function AdminAgentsPage() {
                           <CardTitle className="text-lg">
                             {agent.name || "이름 없음"}
                           </CardTitle>
-                          <CardDescription className="mt-1">
-                            <div className="flex items-center gap-1">
-                              <Mail className="h-3 w-3" />
-                              {agent.email}
-                            </div>
+                          <CardDescription className="mt-1 flex items-center gap-1">
+                            <Mail className="h-3 w-3" />
+                            {agent.email}
                           </CardDescription>
                         </div>
                         <Badge
-                          variant={
-                            agent.is_approved
-                              ? "default"
-                              : "secondary"
-                          }
+                          variant={agent.is_approved ? "default" : "secondary"}
                         >
                           {agent.is_approved ? (
                             <>
@@ -208,11 +210,17 @@ export default function AdminAgentsPage() {
                           </div>
                         )}
                         <div className="text-muted-foreground">
-                          가입일: {new Date(agent.created_at).toLocaleDateString("ko-KR")}
+                          가입일:{" "}
+                          {new Date(agent.created_at).toLocaleDateString(
+                            "ko-KR",
+                          )}
                         </div>
                         {agent.approved_at && (
                           <div className="text-muted-foreground">
-                            승인일: {new Date(agent.approved_at).toLocaleDateString("ko-KR")}
+                            승인일:{" "}
+                            {new Date(agent.approved_at).toLocaleDateString(
+                              "ko-KR",
+                            )}
                           </div>
                         )}
                       </div>
@@ -223,7 +231,8 @@ export default function AdminAgentsPage() {
                             {!agent.dre_number || !agent.brokerage_name ? (
                               <Alert>
                                 <AlertDescription className="text-xs">
-                                  DRE 번호 또는 Brokerage 이름이 입력되지 않았습니다.
+                                  DRE 번호 또는 Brokerage 이름이 입력되지
+                                  않았습니다.
                                 </AlertDescription>
                               </Alert>
                             ) : (
@@ -239,7 +248,11 @@ export default function AdminAgentsPage() {
                           </>
                         )}
                         <Link href={`/admin/agents/${agent.id}`}>
-                          <Button variant="outline" className="w-full" size="sm">
+                          <Button
+                            variant="outline"
+                            className="w-full"
+                            size="sm"
+                          >
                             상세 보기
                           </Button>
                         </Link>
@@ -255,4 +268,3 @@ export default function AdminAgentsPage() {
     </div>
   );
 }
-

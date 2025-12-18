@@ -26,11 +26,12 @@ export async function GET(
     const supabase = getServiceRoleClient();
 
     // 클라이언트 상세 정보 조회
+    // foreign key 컬럼 이름을 사용하여 관계 조회
     const { data: client, error: clientError } = await supabase
       .from("clients")
       .select(`
         *,
-        accounts!clients_owner_agent_id_fkey (
+        accounts!owner_agent_id (
           id,
           name,
           email,
@@ -138,7 +139,7 @@ export async function PATCH(
       }
     });
 
-    updateData.updated_at = new Date().toISOString();
+    // updated_at 컬럼은 테이블에 없으므로 제거
 
     const { data: updatedClient, error: updateError } = await supabase
       .from("clients")
