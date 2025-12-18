@@ -13,15 +13,21 @@ export async function GET() {
   //   return NextResponse.json({ error: "Not available in development" }, { status: 403 });
   // }
 
+  // 대소문자 구분 없이 체크
+  const maintenanceModeValue =
+    process.env.MAINTENANCE_MODE?.toLowerCase() || "";
+  const isProduction = process.env.NODE_ENV === "production";
+  const maintenanceModeActive =
+    isProduction &&
+    (maintenanceModeValue === "true" || maintenanceModeValue === "1");
+
   return NextResponse.json(
     {
       NODE_ENV: process.env.NODE_ENV,
       MAINTENANCE_MODE: process.env.MAINTENANCE_MODE,
-      isProduction: process.env.NODE_ENV === "production",
-      maintenanceModeActive:
-        process.env.NODE_ENV === "production" &&
-        (process.env.MAINTENANCE_MODE === "true" ||
-          process.env.MAINTENANCE_MODE === "1"),
+      maintenanceModeValue,
+      isProduction,
+      maintenanceModeActive,
       timestamp: new Date().toISOString(),
     },
     {

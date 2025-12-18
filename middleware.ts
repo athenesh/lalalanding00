@@ -32,16 +32,19 @@ export default clerkMiddleware(
       // 프로덕션 환경에서만 maintenance mode 활성화
       // Vercel에서는 NODE_ENV가 자동으로 "production"으로 설정됨
       const isProduction = process.env.NODE_ENV === "production";
+      // 대소문자 구분 없이 체크 (true, TRUE, True 모두 허용)
+      const maintenanceModeValue =
+        process.env.MAINTENANCE_MODE?.toLowerCase() || "";
       const maintenanceMode =
         isProduction &&
-        (process.env.MAINTENANCE_MODE === "true" ||
-          process.env.MAINTENANCE_MODE === "1");
+        (maintenanceModeValue === "true" || maintenanceModeValue === "1");
 
       // 디버깅: 환경 변수 로그 (프로덕션에서만)
       if (isProduction) {
         console.log("[Middleware] Environment check:", {
           NODE_ENV: process.env.NODE_ENV,
           MAINTENANCE_MODE: process.env.MAINTENANCE_MODE,
+          maintenanceModeValue,
           maintenanceMode,
         });
       }
@@ -52,7 +55,10 @@ export default clerkMiddleware(
           return NextResponse.next();
         }
         // 프로덕션 점검 모드일 때 로그인/회원가입 경로 명시적 차단
-        if (pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up")) {
+        if (
+          pathname.startsWith("/sign-in") ||
+          pathname.startsWith("/sign-up")
+        ) {
           console.log(
             `[Middleware] Maintenance mode: blocking ${pathname}, redirecting to /maintenance`,
           );

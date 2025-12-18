@@ -11,10 +11,12 @@ import { ClientSignUpContent } from "./client-sign-up-content";
 export default function ClientSignUpPage() {
   // 프로덕션 점검 모드 체크 (페이지 레벨 보호)
   const isProduction = process.env.NODE_ENV === "production";
+  // 대소문자 구분 없이 체크 (true, TRUE, True 모두 허용)
+  const maintenanceModeValue =
+    process.env.MAINTENANCE_MODE?.toLowerCase() || "";
   const maintenanceMode =
     isProduction &&
-    (process.env.MAINTENANCE_MODE === "true" ||
-      process.env.MAINTENANCE_MODE === "1");
+    (maintenanceModeValue === "true" || maintenanceModeValue === "1");
 
   // 프로덕션 점검 모드일 때는 maintenance 페이지로 리다이렉트
   // 개발 환경에서는 항상 클라이언트 컴포넌트 렌더링
