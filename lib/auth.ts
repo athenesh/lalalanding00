@@ -143,17 +143,21 @@ async function getAuthorizedClientIdForUser(
 /**
  * 클라이언트 본인 또는 권한 부여된 사용자의 client_id를 반환합니다.
  * 권한 부여된 클라이언트가 있으면 우선적으로 반환합니다.
+ * 관리자인 경우 쿼리 파라미터로 clientId를 받을 수 있습니다.
  * 둘 다 없으면 null을 반환합니다.
  *
  * 우선순위:
  * 1. 권한 부여된 클라이언트 (배우자가 권한을 받은 클라이언트)
  * 2. 본인 클라이언트
+ * 3. 관리자인 경우 쿼리 파라미터의 clientId (API 라우트에서만)
  *
  * @param userId - Clerk 사용자 ID (API 라우트에서 사용 시 직접 전달)
+ * @param clientIdFromQuery - 쿼리 파라미터에서 받은 clientId (관리자용, 선택사항)
  * @returns client_id 또는 null
  */
 export async function getClientIdForUser(
   userId?: string,
+  clientIdFromQuery?: string,
 ): Promise<string | null> {
   // userId가 제공되지 않으면 getAuthUserId() 호출 (페이지 컴포넌트용)
   // userId가 제공되면 직접 사용 (API 라우트용)
@@ -164,6 +168,32 @@ export async function getClientIdForUser(
   }
 
   const supabase = createClerkSupabaseClient();
+
+  // 0. 관리자인 경우 쿼리 파라미터의 clientId 사용 (API 라우트에서만)
+  if (clientIdFromQuery) {
+    const adminCheck = await isAdmin();
+    if (adminCheck) {
+      console.log("[Auth] 관리자가 쿼리 파라미터의 clientId 사용:", {
+        userId: finalUserId,
+        clientId: clientIdFromQuery,
+      });
+      // clientId가 실제로 존재하는지 확인
+      const { data: client, error: clientError } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("id", clientIdFromQuery)
+        .single();
+
+      if (client && !clientError) {
+        return clientIdFromQuery;
+      } else {
+        console.warn("[Auth] 관리자가 지정한 clientId가 존재하지 않음:", {
+          clientId: clientIdFromQuery,
+          error: clientError,
+        });
+      }
+    }
+  }
 
   // 1. 권한 부여된 사용자인지 먼저 확인 (우선순위)
   // 배우자는 항상 권한을 받은 클라이언트의 데이터를 봐야 함
@@ -198,6 +228,32 @@ export async function getClientIdForUser(
       clientId: ownClient.id,
     });
     return ownClient.id;
+  }
+
+  // 3. 관리자인 경우 첫 번째 클라이언트를 자동으로 선택 (fallback)
+  const adminCheck = await isAdmin();
+  if (adminCheck) {
+    console.log("[Auth] 관리자 확인, 첫 번째 클라이언트 조회 시도:", {
+      userId: finalUserId,
+    });
+    const { data: firstClient, error: firstClientError } = await supabase
+      .from("clients")
+      .select("id")
+      .limit(1)
+      .single();
+
+    if (firstClient && !firstClientError) {
+      console.log("[Auth] 관리자가 첫 번째 클라이언트 사용:", {
+        userId: finalUserId,
+        clientId: firstClient.id,
+      });
+      return firstClient.id;
+    } else {
+      console.log("[Auth] 관리자이지만 클라이언트가 없음:", {
+        userId: finalUserId,
+        error: firstClientError,
+      });
+    }
   }
 
   // 에러가 있으면 로그 출력
@@ -392,4 +448,51 @@ export async function getOrCreateAccount() {
 
   console.log("[Auth] Account 생성 성공:", { accountId: newAccount.id });
   return newAccount;
+}
+
+/**
+ * ADMIN인지 확인합니다.
+ * ADMIN은 환경 변수 ADMIN_EMAIL에 지정된 이메일 주소로 식별됩니다.
+ * ADMIN이 아닌 경우 홈으로 리다이렉트합니다.
+ */
+export async function requireAdmin() {
+  const user = await getAuthUser();
+
+  if (!user) {
+    redirect("/sign-in");
+  }
+
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (!adminEmail) {
+    console.error("[Auth] ADMIN_EMAIL 환경 변수가 설정되지 않았습니다.");
+    redirect("/");
+  }
+
+  const userEmail = user.emailAddresses[0]?.emailAddress;
+  if (userEmail?.toLowerCase() !== adminEmail.toLowerCase()) {
+    console.log("[Auth] ADMIN 권한 없음:", { userEmail, adminEmail });
+    redirect("/");
+  }
+
+  console.log("[Auth] ADMIN 권한 확인됨:", { userEmail });
+}
+
+/**
+ * ADMIN인지 확인하고, ADMIN이면 true를 반환합니다.
+ * API 라우트에서 사용합니다.
+ */
+export async function isAdmin(): Promise<boolean> {
+  const user = await getAuthUser();
+
+  if (!user) {
+    return false;
+  }
+
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (!adminEmail) {
+    return false;
+  }
+
+  const userEmail = user.emailAddresses[0]?.emailAddress;
+  return userEmail?.toLowerCase() === adminEmail.toLowerCase();
 }

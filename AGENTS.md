@@ -195,7 +195,11 @@ NEXT_PUBLIC_CHAT_MAX_RETRY_COUNT=5
 NEXT_PUBLIC_CHAT_BACKOFF_MULTIPLIER=2
 
 # Maintenance Mode (서비스 점검 모드)
-# true 또는 1로 설정 시 모든 사용자를 /maintenance 페이지로 리다이렉트
+# 프로덕션 환경에서 true 또는 1로 설정 시:
+# - 모든 사용자를 /maintenance 페이지로 리다이렉트
+# - 로그인/회원가입 페이지 접근 차단
+# 개발 환경에서는 이 설정이 무시되고 정상 작동합니다.
+# Vercel 프로덕션 환경에는 이미 설정되어 있습니다.
 MAINTENANCE_MODE=false
 ```
 

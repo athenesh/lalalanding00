@@ -294,25 +294,72 @@ export async function DELETE(request: Request) {
  * GET /api/client/authorize
  * 현재 클라이언트에 부여된 권한 목록을 조회합니다.
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
     console.log("[API] GET /api/client/authorize 호출");
-
-    // 클라이언트 권한 확인
-    await requireClient();
 
     const userId = await getAuthUserId();
     const supabase = createClerkSupabaseClient();
 
-    // 현재 클라이언트 정보 조회
-    const { data: client, error: clientError } = await supabase
-      .from("clients")
-      .select("id")
-      .eq("clerk_user_id", userId)
-      .single();
+    // 관리자 권한 확인
+    const { isAdmin } = await import("@/lib/auth");
+    const adminCheck = await isAdmin();
 
-    if (clientError || !client) {
-      console.error("[API] Client fetch error:", clientError);
+    // 쿼리 파라미터에서 clientId 가져오기 (관리자용)
+    const url = new URL(request.url);
+    const clientIdFromQuery = url.searchParams.get("clientId") || undefined;
+
+    let clientId: string | null = null;
+
+    if (adminCheck && clientIdFromQuery) {
+      // 관리자가 쿼리 파라미터로 clientId를 지정한 경우
+      clientId = clientIdFromQuery;
+    } else {
+      // 클라이언트 권한 확인 (관리자가 아닌 경우)
+      if (!adminCheck) {
+        const role = await (await import("@/lib/auth")).getAuthRole();
+        if (role !== "client") {
+          return NextResponse.json(
+            { error: "Unauthorized" },
+            { status: 403 }
+          );
+        }
+      }
+
+      // 현재 클라이언트 정보 조회
+      const { data: client, error: clientError } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("clerk_user_id", userId)
+        .single();
+
+      if (clientError || !client) {
+        // 관리자인 경우 첫 번째 클라이언트 사용
+        if (adminCheck) {
+          const { data: firstClient } = await supabase
+            .from("clients")
+            .select("id")
+            .limit(1)
+            .single();
+          if (firstClient) {
+            clientId = firstClient.id;
+          }
+        }
+
+        if (!clientId) {
+          console.error("[API] Client fetch error:", clientError);
+          return NextResponse.json(
+            { error: "클라이언트 정보를 찾을 수 없습니다." },
+            { status: 404 }
+          );
+        }
+      } else {
+        clientId = client.id;
+      }
+    }
+
+    // clientId 검증
+    if (!clientId) {
       return NextResponse.json(
         { error: "클라이언트 정보를 찾을 수 없습니다." },
         { status: 404 }
@@ -323,7 +370,7 @@ export async function GET() {
     const { data: authorizations, error: fetchError } = await supabase
       .from("client_authorizations")
       .select("*")
-      .eq("client_id", client.id)
+      .eq("client_id", clientId)
       .order("granted_at", { ascending: false });
 
     if (fetchError) {
@@ -335,7 +382,7 @@ export async function GET() {
     }
 
     console.log("[API] 권한 목록 조회 성공:", {
-      clientId: client.id,
+      clientId: clientId,
       count: authorizations?.length || 0,
     });
 

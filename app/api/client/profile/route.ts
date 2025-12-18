@@ -9,7 +9,7 @@ import { updateClientProfileSchema } from "@/lib/validations/api-schemas";
  * 클라이언트 자신의 프로필 정보를 조회합니다.
  * 권한 부여된 사용자도 접근 가능합니다.
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
     console.log("[API] GET /api/client/profile 호출");
 
@@ -21,8 +21,12 @@ export async function GET() {
 
     const supabase = createClerkSupabaseClient();
 
+    // 쿼리 파라미터에서 clientId 가져오기 (관리자용)
+    const url = new URL(request.url);
+    const clientIdFromQuery = url.searchParams.get("clientId") || undefined;
+
     // 클라이언트 본인 또는 권한 부여된 사용자의 client_id 조회
-    const clientId = await getClientIdForUser(userId);
+    const clientId = await getClientIdForUser(userId, clientIdFromQuery);
 
     if (!clientId) {
       console.log("[API] 클라이언트 또는 권한 부여된 사용자가 아님");

@@ -42,6 +42,46 @@ export async function POST(request: Request) {
     // 초대 토큰 생성
     const invitationToken = randomUUID();
 
+    // 초대 코드 생성 (6자리 영숫자)
+    const generateInvitationCode = () => {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 혼동하기 쉬운 문자 제외 (0, O, I, 1)
+      let code = "";
+      for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return code;
+    };
+
+    let invitationCode = generateInvitationCode();
+    let codeExists = true;
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    // 중복되지 않는 코드 생성
+    while (codeExists && attempts < maxAttempts) {
+      const { data: existing } = await supabase
+        .from("client_invitations")
+        .select("id")
+        .eq("invitation_code", invitationCode)
+        .single();
+
+      if (!existing) {
+        codeExists = false;
+      } else {
+        invitationCode = generateInvitationCode();
+        attempts++;
+      }
+    }
+
+    if (codeExists) {
+      return NextResponse.json(
+        {
+          error: "Failed to generate unique invitation code",
+        },
+        { status: 500 }
+      );
+    }
+
     // 만료 시간 계산 (현재 시간 + expiresInDays일)
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + expiresInDays);
@@ -50,6 +90,7 @@ export async function POST(request: Request) {
       agentId: account.id,
       email,
       token: invitationToken,
+      code: invitationCode,
       expiresAt: expiresAt.toISOString(),
     });
 
@@ -59,6 +100,7 @@ export async function POST(request: Request) {
       .insert({
         agent_id: account.id,
         invitation_token: invitationToken,
+        invitation_code: invitationCode,
         email: email || null,
         expires_at: expiresAt.toISOString(),
       })
@@ -90,6 +132,7 @@ export async function POST(request: Request) {
       invitation: {
         id: invitation.id,
         token: invitationToken,
+        code: invitationCode,
         link: invitationLink,
         email: invitation.email,
         expiresAt: invitation.expires_at,
@@ -145,6 +188,9 @@ export async function GET() {
     const invitationsWithLinks = invitations.map((invitation) => ({
       ...invitation,
       link: `${baseUrl}/sign-up/client?token=${invitation.invitation_token}`,
+      codeLink: invitation.invitation_code
+        ? `${baseUrl}/sign-up/client?code=${invitation.invitation_code}`
+        : null,
       isExpired: new Date(invitation.expires_at) < new Date(),
       isUsed: invitation.used_at !== null,
     }));

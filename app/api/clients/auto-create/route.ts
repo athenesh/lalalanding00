@@ -38,11 +38,13 @@ export async function POST(request: Request) {
     }
     const supabase = createClerkSupabaseClient();
 
-    // 요청 본문에서 초대 토큰 가져오기
+    // 요청 본문에서 초대 토큰 또는 코드 가져오기
     let invitationToken: string | null = null;
+    let invitationCode: string | null = null;
     try {
       const body = await request.json().catch(() => ({}));
       invitationToken = body.invitationToken || null;
+      invitationCode = body.invitationCode || null;
     } catch {
       // 본문이 없어도 계속 진행
     }
@@ -74,14 +76,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // 초대 토큰이 있으면 검증 및 에이전트 정보 가져오기
+    // 초대 토큰 또는 코드가 있으면 검증 및 에이전트 정보 가져오기
     let ownerAgentId: string | null = null;
+    let usedInvitationToken: string | null = null;
+    
     if (invitationToken) {
       console.log("[API] Validating invitation token:", invitationToken);
       
       const { data: invitation, error: invitationError } = await supabase
         .from("client_invitations")
-        .select("id, agent_id, expires_at, used_at")
+        .select("id, agent_id, expires_at, used_at, invitation_token")
         .eq("invitation_token", invitationToken)
         .single();
 
@@ -110,7 +114,44 @@ export async function POST(request: Request) {
       }
 
       ownerAgentId = invitation.agent_id;
+      usedInvitationToken = invitation.invitation_token;
       console.log("[API] Invitation validated, agent ID:", ownerAgentId);
+    } else if (invitationCode) {
+      console.log("[API] Validating invitation code:", invitationCode);
+      
+      const { data: invitation, error: invitationError } = await supabase
+        .from("client_invitations")
+        .select("id, agent_id, expires_at, used_at, invitation_token")
+        .eq("invitation_code", invitationCode.toUpperCase())
+        .single();
+
+      if (invitationError || !invitation) {
+        console.error("[API] Invalid invitation code:", invitationError);
+        return NextResponse.json(
+          { error: "Invalid or expired invitation code" },
+          { status: 400 }
+        );
+      }
+
+      // 만료 여부 확인
+      if (new Date(invitation.expires_at) < new Date()) {
+        return NextResponse.json(
+          { error: "Invitation code has expired" },
+          { status: 400 }
+        );
+      }
+
+      // 사용 여부 확인
+      if (invitation.used_at) {
+        return NextResponse.json(
+          { error: "Invitation code has already been used" },
+          { status: 400 }
+        );
+      }
+
+      ownerAgentId = invitation.agent_id;
+      usedInvitationToken = invitation.invitation_token;
+      console.log("[API] Invitation code validated, agent ID:", ownerAgentId);
     }
 
     // 이미 레코드가 있으면 반환
@@ -138,7 +179,8 @@ export async function POST(request: Request) {
       name,
       email,
       ownerAgentId,
-      invitationToken,
+      invitationToken: usedInvitationToken,
+      invitationCode,
     });
 
     const { data: newClient, error: createError } = await supabase
@@ -146,7 +188,7 @@ export async function POST(request: Request) {
       .insert({
         clerk_user_id: userId,
         owner_agent_id: ownerAgentId,
-        invitation_token: invitationToken,
+        invitation_token: usedInvitationToken,
         access_level: "invited", // 초대받은 상태
         name: name,
         email: email,
@@ -176,18 +218,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // 초대 토큰을 사용된 것으로 표시
-    if (invitationToken) {
+    // 초대 토큰 또는 코드를 사용된 것으로 표시
+    if (usedInvitationToken) {
       const { error: updateInvitationError } = await supabase
         .from("client_invitations")
         .update({ used_at: new Date().toISOString() })
-        .eq("invitation_token", invitationToken);
+        .eq("invitation_token", usedInvitationToken);
 
       if (updateInvitationError) {
         console.error("[API] Failed to mark invitation as used:", updateInvitationError);
         // 에러가 나도 클라이언트 생성은 성공했으므로 계속 진행
       } else {
-        console.log("[API] Invitation marked as used:", invitationToken);
+        console.log("[API] Invitation marked as used:", usedInvitationToken);
       }
     }
 

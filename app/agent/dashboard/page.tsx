@@ -52,6 +52,9 @@ export default function AgentDashboard() {
   const [invitationEmail, setInvitationEmail] = useState("");
   const [isCreatingInvitation, setIsCreatingInvitation] = useState(false);
   const [generatedInvitationLink, setGeneratedInvitationLink] = useState("");
+  const [generatedInvitationCode, setGeneratedInvitationCode] = useState("");
+  const [isApproved, setIsApproved] = useState<boolean | null>(null);
+  const [isCheckingApproval, setIsCheckingApproval] = useState(true);
   const { toast } = useToast();
   const router = useRouter();
   const { user, isLoaded: userLoaded } = useUser();
@@ -178,6 +181,41 @@ export default function AgentDashboard() {
     }
   }, [toast]);
 
+  // 승인 상태 확인
+  useEffect(() => {
+    const checkApprovalStatus = async () => {
+      try {
+        setIsCheckingApproval(true);
+        const response = await fetch("/api/agent/status");
+        if (response.ok) {
+          const data = await response.json();
+          setIsApproved(data.isApproved);
+
+          // 승인되지 않은 경우 완료 페이지로 리다이렉트
+          if (!data.isApproved) {
+            console.log("[AgentDashboard] Agent not approved, redirecting to complete page");
+            router.push("/sign-up/agent/complete");
+            return;
+          }
+        } else {
+          // 에러 발생 시 완료 페이지로 리다이렉트 (정보 미입력 가능성)
+          console.log("[AgentDashboard] Failed to check approval status, redirecting to complete page");
+          router.push("/sign-up/agent/complete");
+          return;
+        }
+      } catch (error) {
+        console.error("[AgentDashboard] Error checking approval status:", error);
+        router.push("/sign-up/agent/complete");
+      } finally {
+        setIsCheckingApproval(false);
+      }
+    };
+
+    if (userLoaded && user) {
+      checkApprovalStatus();
+    }
+  }, [userLoaded, user, router]);
+
   useEffect(() => {
     if (userLoaded) {
       if (!user) {
@@ -197,11 +235,13 @@ export default function AgentDashboard() {
         return;
       }
 
-      // 에이전트인 경우 클라이언트 목록 로드
-      loadClients();
-      loadUnassignedClients();
+      // 승인된 에이전트만 클라이언트 목록 로드
+      if (isApproved === true) {
+        loadClients();
+        loadUnassignedClients();
+      }
     }
-  }, [user, userLoaded, router, toast, loadClients, loadUnassignedClients]);
+  }, [user, userLoaded, router, toast, loadClients, loadUnassignedClients, isApproved]);
 
   // 클라이언트 할당 핸들러
   const handleAssignClient = async (clientId: string) => {
@@ -277,10 +317,11 @@ export default function AgentDashboard() {
 
       const { invitation } = await response.json();
       setGeneratedInvitationLink(invitation.link);
+      setGeneratedInvitationCode(invitation.code || "");
 
       toast({
         title: "초대 링크 생성 완료",
-        description: "초대 링크가 생성되었습니다. 클라이언트에게 공유하세요.",
+        description: "초대 링크와 코드가 생성되었습니다. 클라이언트에게 공유하세요.",
       });
     } catch (error) {
       console.error("[AgentDashboard] Error creating invitation:", error);
@@ -321,6 +362,23 @@ export default function AgentDashboard() {
     setInvitationEmail("");
     setGeneratedInvitationLink("");
   };
+
+  // 승인 상태 확인 중
+  if (isCheckingApproval || isApproved === null) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">승인 상태를 확인하는 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 승인되지 않은 경우 (이미 리다이렉트되지만 안전장치)
+  if (!isApproved) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -381,25 +439,65 @@ export default function AgentDashboard() {
                   </>
                 ) : (
                   <>
-                    <div className="space-y-2">
-                      <Label>생성된 초대 링크</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          value={generatedInvitationLink}
-                          readOnly
-                          className="font-mono text-sm"
-                        />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={handleCopyInvitationLink}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>생성된 초대 링크</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={generatedInvitationLink}
+                            readOnly
+                            className="font-mono text-sm"
+                          />
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={handleCopyInvitationLink}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          링크를 복사하여 클라이언트에게 공유하세요.
+                        </p>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        링크를 복사하여 클라이언트에게 공유하세요.
-                      </p>
+
+                      {generatedInvitationCode && (
+                        <div className="space-y-2">
+                          <Label>초대 코드</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              value={generatedInvitationCode}
+                              readOnly
+                              className="font-mono text-sm text-center text-lg font-bold"
+                            />
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(generatedInvitationCode);
+                                  toast({
+                                    title: "복사 완료",
+                                    description: "초대 코드가 클립보드에 복사되었습니다.",
+                                  });
+                                } catch (error) {
+                                  console.error("[AgentDashboard] Error copying code:", error);
+                                  toast({
+                                    title: "복사 실패",
+                                    description: "코드 복사에 실패했습니다.",
+                                    variant: "destructive",
+                                  });
+                                }
+                              }}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            초대 코드를 클라이언트에게 공유하세요. 코드는 더 간편하게 사용할 수 있습니다.
+                          </p>
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <Button

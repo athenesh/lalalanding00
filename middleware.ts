@@ -41,6 +41,13 @@ export default clerkMiddleware(
         if (pathname === "/maintenance") {
           return NextResponse.next();
         }
+        // 프로덕션 점검 모드일 때 로그인/회원가입 경로 명시적 차단
+        if (pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up")) {
+          console.log(
+            `[Middleware] Maintenance mode: blocking ${pathname}, redirecting to /maintenance`,
+          );
+          return NextResponse.redirect(new URL("/maintenance", req.url));
+        }
         // 나머지 모든 경로는 maintenance 페이지로 리다이렉트
         console.log(
           "[Middleware] Maintenance mode active, redirecting to /maintenance",
@@ -64,14 +71,14 @@ export default clerkMiddleware(
 
         // 루트 경로나 로그인/회원가입 페이지 접근 시 역할에 따라 리다이렉트
         // 단, 역할이 없으면 리다이렉트하지 않음 (회원가입 진행 중일 수 있음)
+        // 에이전트는 승인 상태를 확인해야 하므로 클라이언트 사이드에서 처리
         if (
           pathname === "/" ||
           pathname.startsWith("/sign-in") ||
           pathname.startsWith("/sign-up")
         ) {
-          if (role === "agent") {
-            return NextResponse.redirect(new URL("/agent/dashboard", req.url));
-          }
+          // 에이전트는 홈 페이지에서 승인 상태를 확인하도록 허용 (클라이언트 사이드 처리)
+          // 클라이언트는 바로 홈으로 리다이렉트
           if (role === "client") {
             return NextResponse.redirect(new URL("/client/home", req.url));
           }
@@ -112,6 +119,14 @@ export default clerkMiddleware(
           // role이 "client"이거나 없으면 일단 허용
           // - role이 "client": 클라이언트 본인
           // - role이 없음: 권한 부여된 사용자일 수 있음 (페이지에서 확인)
+        }
+
+        // 관리자 전용 라우트 - 관리자 권한은 페이지 레벨에서 체크 (requireAdmin)
+        // 미들웨어에서는 기본 인증만 확인
+        if (pathname.startsWith("/admin")) {
+          // 관리자 라우트는 requireAdmin()에서 이메일 기반으로 체크하므로
+          // 여기서는 인증된 사용자만 허용
+          // 실제 관리자 권한은 layout.tsx의 requireAdmin()에서 확인
         }
       }
     } catch (error) {

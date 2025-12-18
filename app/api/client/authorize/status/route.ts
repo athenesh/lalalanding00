@@ -10,15 +10,19 @@ import { createClerkSupabaseClient } from "@/lib/supabase/server";
  * - 권한이 있으면: { hasAuthorization: true, client: {...}, authorization: {...} }
  * - 권한이 없으면: 404
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
     console.log("[API] GET /api/client/authorize/status 호출");
 
     const userId = await getAuthUserId();
     const supabase = createClerkSupabaseClient();
 
+    // 쿼리 파라미터에서 clientId 가져오기 (관리자용)
+    const url = new URL(request.url);
+    const clientIdFromQuery = url.searchParams.get("clientId") || undefined;
+
     // 클라이언트 본인 또는 권한 부여된 사용자의 client_id 조회
-    const clientId = await getClientIdForUser();
+    const clientId = await getClientIdForUser(userId, clientIdFromQuery);
 
     if (!clientId) {
       console.log("[API] 권한 부여 상태 없음:", { userId });

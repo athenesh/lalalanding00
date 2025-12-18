@@ -46,8 +46,32 @@ export default function Home() {
     // role이 있는 경우
     if (role === "agent") {
       hasRedirected.current = true;
-      console.log("[HomePage] Redirecting agent to dashboard (one-time)");
-      window.location.href = "/agent/dashboard";
+      
+      // 에이전트 승인 상태 확인
+      const checkAgentApproval = async () => {
+        try {
+          const response = await fetch("/api/agent/status");
+          if (response.ok) {
+            const data = await response.json();
+            if (data.isApproved) {
+              console.log("[HomePage] Agent approved, redirecting to dashboard");
+              window.location.href = "/agent/dashboard";
+            } else {
+              console.log("[HomePage] Agent not approved, redirecting to complete page");
+              window.location.href = "/sign-up/agent/complete";
+            }
+          } else {
+            // API 호출 실패 시 complete 페이지로 (정보 미입력 가능성)
+            console.log("[HomePage] Failed to check approval status, redirecting to complete page");
+            window.location.href = "/sign-up/agent/complete";
+          }
+        } catch (error) {
+          console.error("[HomePage] Error checking agent approval:", error);
+          window.location.href = "/sign-up/agent/complete";
+        }
+      };
+      
+      checkAgentApproval();
       return;
     }
 
@@ -58,13 +82,28 @@ export default function Home() {
       return;
     }
 
-    // role이 없지만 로그인한 경우 권한 부여 상태 확인
+    // role이 없지만 로그인한 경우 관리자 여부 및 권한 부여 상태 확인
     if (!role && userId && !isCheckingAuthorization.current) {
       isCheckingAuthorization.current = true;
       
-      // 권한 부여 상태 확인 함수 (useEffect 내부에서 정의)
-      const checkAuthorizationStatus = async () => {
+      // 관리자 여부 및 권한 부여 상태 확인 함수
+      const checkAdminAndAuthorization = async () => {
         try {
+          // 먼저 관리자 여부 확인
+          console.log("[HomePage] 관리자 여부 확인 시작");
+          const adminResponse = await fetch("/api/admin/check");
+          
+          if (adminResponse.ok) {
+            const adminData = await adminResponse.json();
+            if (adminData.isAdmin) {
+              hasRedirected.current = true;
+              console.log("[HomePage] 관리자 확인, /admin/dashboard로 리다이렉트");
+              window.location.href = "/admin/dashboard";
+              return;
+            }
+          }
+          
+          // 관리자가 아니면 권한 부여 상태 확인
           console.log("[HomePage] 권한 부여 상태 확인 시작");
           const response = await fetch("/api/client/authorize/status");
 
@@ -84,13 +123,13 @@ export default function Home() {
             console.error("[HomePage] 권한 상태 확인 실패:", response.status);
           }
         } catch (error) {
-          console.error("[HomePage] 권한 상태 확인 중 오류:", error);
+          console.error("[HomePage] 관리자/권한 상태 확인 중 오류:", error);
         } finally {
           isCheckingAuthorization.current = false;
         }
       };
 
-      checkAuthorizationStatus();
+      checkAdminAndAuthorization();
     }
   }, [authLoaded, userLoaded, role, userId]);
 
@@ -238,6 +277,28 @@ export default function Home() {
                       onClick={() => router.push("/sign-up/client/complete")}
                     >
                       클라이언트 역할 설정
+                    </Button>
+                  </div>
+                  <div className="mt-4">
+                    <Button
+                      variant="ghost"
+                      onClick={async () => {
+                        try {
+                          const response = await fetch("/api/admin/check");
+                          if (response.ok) {
+                            const data = await response.json();
+                            if (data.isAdmin) {
+                              router.push("/admin/dashboard");
+                            } else {
+                              // 관리자가 아닌 경우는 아무것도 하지 않음
+                            }
+                          }
+                        } catch (error) {
+                          console.error("[HomePage] 관리자 확인 실패:", error);
+                        }
+                      }}
+                    >
+                      관리자 대시보드로 이동
                     </Button>
                   </div>
                 </div>
