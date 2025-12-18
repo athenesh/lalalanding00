@@ -32,6 +32,30 @@ export default clerkMiddleware(
         return NextResponse.next();
       }
 
+      // Maintenance mode 체크 전에 사용자 인증 정보 가져오기 (관리자 예외 처리용)
+      const { userId, sessionClaims } = await auth();
+      const role = (sessionClaims?.publicMetadata as { role?: string })?.role;
+
+      // 🔥 관리자 체크 (maintenance mode 예외 처리용)
+      let isAdminUser = false;
+      if (userId) {
+        try {
+          const adminEmail = process.env.ADMIN_EMAIL;
+          if (adminEmail) {
+            const client = await clerkClient();
+            const user = await client.users.getUser(userId);
+            const userEmail = user.emailAddresses[0]?.emailAddress;
+            if (userEmail?.toLowerCase() === adminEmail.toLowerCase()) {
+              isAdminUser = true;
+              console.log("[Middleware] 관리자 확인됨:", userEmail);
+            }
+          }
+        } catch (error) {
+          // 관리자 체크 실패 시 무시 (성능을 위해 에러 로그만)
+          console.error("[Middleware] 관리자 체크 중 오류:", error);
+        }
+      }
+
       // Maintenance mode 체크 (가장 우선순위)
       // 프로덕션 환경에서만 maintenance mode 활성화
       // Vercel에서는 NODE_ENV가 자동으로 "production"으로 설정됨
@@ -50,52 +74,37 @@ export default clerkMiddleware(
           MAINTENANCE_MODE: process.env.MAINTENANCE_MODE,
           maintenanceModeValue,
           maintenanceMode,
+          isAdminUser,
         });
       }
 
       if (maintenanceMode) {
-        // Maintenance 페이지로의 접근만 허용
-        if (pathname === "/maintenance") {
-          return NextResponse.next();
-        }
-        // 프로덕션 점검 모드일 때 로그인/회원가입 경로 명시적 차단
-        if (
-          pathname.startsWith("/sign-in") ||
-          pathname.startsWith("/sign-up")
-        ) {
+        // 🔥 관리자는 maintenance mode에서도 접근 가능
+        if (isAdminUser) {
           console.log(
-            `[Middleware] Maintenance mode: blocking ${pathname}, redirecting to /maintenance`,
+            "[Middleware] Maintenance mode active, but admin access allowed",
+          );
+          // 관리자는 maintenance mode를 우회하고 정상 진행
+        } else {
+          // Maintenance 페이지로의 접근만 허용
+          if (pathname === "/maintenance") {
+            return NextResponse.next();
+          }
+          // 프로덕션 점검 모드일 때 로그인/회원가입 경로 명시적 차단
+          if (
+            pathname.startsWith("/sign-in") ||
+            pathname.startsWith("/sign-up")
+          ) {
+            console.log(
+              `[Middleware] Maintenance mode: blocking ${pathname}, redirecting to /maintenance`,
+            );
+            return NextResponse.redirect(new URL("/maintenance", req.url));
+          }
+          // 나머지 모든 경로는 maintenance 페이지로 리다이렉트
+          console.log(
+            "[Middleware] Maintenance mode active, redirecting to /maintenance",
           );
           return NextResponse.redirect(new URL("/maintenance", req.url));
-        }
-        // 나머지 모든 경로는 maintenance 페이지로 리다이렉트
-        console.log(
-          "[Middleware] Maintenance mode active, redirecting to /maintenance",
-        );
-        return NextResponse.redirect(new URL("/maintenance", req.url));
-      }
-
-      // Maintenance mode가 아닐 때만 인증 로직 실행
-      const { userId, sessionClaims } = await auth();
-      const role = (sessionClaims?.publicMetadata as { role?: string })?.role;
-
-      // 🔥 관리자 체크 (role과 관계없이 우선 확인)
-      let isAdminUser = false;
-      if (userId) {
-        try {
-          const adminEmail = process.env.ADMIN_EMAIL;
-          if (adminEmail) {
-            const client = await clerkClient();
-            const user = await client.users.getUser(userId);
-            const userEmail = user.emailAddresses[0]?.emailAddress;
-            if (userEmail?.toLowerCase() === adminEmail.toLowerCase()) {
-              isAdminUser = true;
-              console.log("[Middleware] 관리자 확인됨:", userEmail);
-            }
-          }
-        } catch (error) {
-          // 관리자 체크 실패 시 무시 (성능을 위해 에러 로그만)
-          console.error("[Middleware] 관리자 체크 중 오류:", error);
         }
       }
 
