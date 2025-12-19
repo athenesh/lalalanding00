@@ -120,7 +120,7 @@ export default clerkMiddleware(
           // /admin 경로는 maintenance mode를 우회하고 정상 진행
           // layout.tsx에서 requireAdmin()이 권한 체크를 수행
         } else if (isAdminUser) {
-          // 관리자 확인된 경우 모든 경로 접근 가능
+          // 관리자 확인된 경우 모든 경로 접근 가능 (홈 페이지 포함)
           console.log(
             "[Middleware] Maintenance mode active, but admin access allowed",
             {
@@ -130,6 +130,18 @@ export default clerkMiddleware(
             },
           );
           // 관리자는 maintenance mode를 우회하고 정상 진행
+        } else if (pathname === "/" && userId) {
+          // 🔥 홈 페이지에 로그인한 사용자가 접근하는 경우
+          // 관리자 체크가 실패했을 수 있으므로, 홈 페이지에서 클라이언트 사이드로 관리자 체크를 수행하도록 허용
+          // (홈 페이지에서 /api/admin/check를 호출하여 관리자 여부를 확인하고 /admin/dashboard로 리다이렉트)
+          console.log(
+            "[Middleware] Maintenance mode active, but allowing / for logged-in user (will check admin in client)",
+            {
+              pathname,
+              userId,
+            },
+          );
+          // 홈 페이지는 maintenance mode를 우회하고 정상 진행
         } else {
           // Maintenance 페이지로의 접근만 허용
           if (pathname === "/maintenance") {

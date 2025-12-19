@@ -459,22 +459,38 @@ export async function requireAdmin() {
   const user = await getAuthUser();
 
   if (!user) {
+    console.warn("[Auth] requireAdmin: 사용자 정보 없음, /sign-in으로 리다이렉트");
     redirect("/sign-in");
   }
 
   const adminEmail = process.env.ADMIN_EMAIL;
   if (!adminEmail) {
     console.error("[Auth] ADMIN_EMAIL 환경 변수가 설정되지 않았습니다.");
+    console.error("[Auth] requireAdmin 실패: 환경 변수 없음, /로 리다이렉트");
     redirect("/");
   }
 
   const userEmail = user.emailAddresses[0]?.emailAddress;
-  if (userEmail?.toLowerCase() !== adminEmail.toLowerCase()) {
-    console.log("[Auth] ADMIN 권한 없음:", { userEmail, adminEmail });
+  if (!userEmail) {
+    console.warn("[Auth] requireAdmin: 사용자 이메일 주소 없음, /로 리다이렉트");
     redirect("/");
   }
 
-  console.log("[Auth] ADMIN 권한 확인됨:", { userEmail });
+  const isAdmin = userEmail.toLowerCase() === adminEmail.toLowerCase();
+  if (!isAdmin) {
+    console.log("[Auth] ADMIN 권한 없음:", {
+      userEmail: userEmail.toLowerCase(),
+      adminEmail: adminEmail.toLowerCase(),
+      match: false,
+    });
+    console.log("[Auth] requireAdmin 실패: 권한 없음, /로 리다이렉트");
+    redirect("/");
+  }
+
+  console.log("[Auth] ADMIN 권한 확인됨:", {
+    userEmail: userEmail.toLowerCase(),
+    adminEmail: adminEmail.toLowerCase(),
+  });
 }
 
 /**
