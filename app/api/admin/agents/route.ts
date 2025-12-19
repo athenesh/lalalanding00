@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 
     // Clerk에서 실제로 존재하는 모든 사용자 ID 가져오기
     const clerk = await clerkClient();
-    let validClerkUserIds: Set<string> = new Set();
+    const validClerkUserIds: Set<string> = new Set();
     
     try {
       const allClerkUsers = await clerk.users.getUserList({
