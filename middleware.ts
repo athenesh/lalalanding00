@@ -41,18 +41,44 @@ export default clerkMiddleware(
       if (userId) {
         try {
           const adminEmail = process.env.ADMIN_EMAIL;
-          if (adminEmail) {
+          if (!adminEmail) {
+            console.warn(
+              "[Middleware] ADMIN_EMAIL 환경 변수가 설정되지 않았습니다.",
+            );
+          } else {
             const client = await clerkClient();
             const user = await client.users.getUser(userId);
             const userEmail = user.emailAddresses[0]?.emailAddress;
-            if (userEmail?.toLowerCase() === adminEmail.toLowerCase()) {
-              isAdminUser = true;
-              console.log("[Middleware] 관리자 확인됨:", userEmail);
+
+            if (userEmail) {
+              const isAdmin =
+                userEmail.toLowerCase() === adminEmail.toLowerCase();
+              if (isAdmin) {
+                isAdminUser = true;
+                console.log("[Middleware] 관리자 확인됨:", userEmail);
+              } else {
+                // 프로덕션에서만 상세 로그 (디버깅용)
+                if (process.env.NODE_ENV === "production") {
+                  console.log("[Middleware] 관리자 아님:", {
+                    userEmail: userEmail.toLowerCase(),
+                    adminEmail: adminEmail.toLowerCase(),
+                    match: false,
+                  });
+                }
+              }
+            } else {
+              console.warn(
+                "[Middleware] 사용자 이메일 주소를 찾을 수 없습니다.",
+              );
             }
           }
         } catch (error) {
-          // 관리자 체크 실패 시 무시 (성능을 위해 에러 로그만)
-          console.error("[Middleware] 관리자 체크 중 오류:", error);
+          // 관리자 체크 실패 시 상세 로그
+          console.error("[Middleware] 관리자 체크 중 오류:", {
+            error: error instanceof Error ? error.message : "Unknown error",
+            userId,
+            pathname,
+          });
         }
       }
 
@@ -80,11 +106,19 @@ export default clerkMiddleware(
 
       if (maintenanceMode) {
         // 🔥 관리자는 maintenance mode에서도 접근 가능
-        if (isAdminUser) {
-          console.log(
-            "[Middleware] Maintenance mode active, but admin access allowed",
-          );
-          // 관리자는 maintenance mode를 우회하고 정상 진행
+        // 🔥 /admin 경로는 관리자 전용이므로 maintenance mode 예외 처리
+        // (실제 권한 체크는 layout.tsx의 requireAdmin()에서 수행)
+        if (isAdminUser || pathname.startsWith("/admin")) {
+          if (isAdminUser) {
+            console.log(
+              "[Middleware] Maintenance mode active, but admin access allowed",
+            );
+          } else if (pathname.startsWith("/admin")) {
+            console.log(
+              "[Middleware] Maintenance mode active, but /admin path allowed (will check in layout)",
+            );
+          }
+          // 관리자 또는 /admin 경로는 maintenance mode를 우회하고 정상 진행
         } else {
           // Maintenance 페이지로의 접근만 허용
           if (pathname === "/maintenance") {
