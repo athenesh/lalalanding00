@@ -56,6 +56,7 @@ export default function RootLayout({
       <html lang="ko">
         <body
           className={`${geistSans.variable} ${geistMono.variable} ${notoSansKR.variable} antialiased`}
+          suppressHydrationWarning
         >
           <Providers>
             <SyncUserProvider>

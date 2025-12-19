@@ -22,20 +22,45 @@ export async function POST(request: Request) {
     // 인증 확인 (리다이렉트 없이)
     const { userId } = await auth();
     if (!userId) {
+      console.error("[API] POST /api/clients/auto-create: 인증 실패 - userId 없음");
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
 
+    console.log("[API] POST /api/clients/auto-create: userId 확인됨", { userId });
+
     // 클라이언트 역할 확인
-    const role = await getAuthRole();
+    let role: "agent" | "client" | null = null;
+    try {
+      role = await getAuthRole();
+      console.log("[API] POST /api/clients/auto-create: 역할 확인됨", { role, userId });
+    } catch (roleError) {
+      console.error("[API] POST /api/clients/auto-create: 역할 확인 실패", {
+        error: roleError,
+        userId,
+      });
+      return NextResponse.json(
+        {
+          error: "Failed to verify user role",
+          details: roleError instanceof Error ? roleError.message : "Unknown error",
+        },
+        { status: 500 }
+      );
+    }
+
     if (role !== "client") {
+      console.warn("[API] POST /api/clients/auto-create: 클라이언트 역할이 아님", {
+        role,
+        userId,
+      });
       return NextResponse.json(
         { error: "Only clients can create client records" },
         { status: 403 }
       );
     }
+
     const supabase = createClerkSupabaseClient();
 
     // 요청 본문에서 초대 토큰 또는 코드 가져오기
@@ -50,10 +75,31 @@ export async function POST(request: Request) {
     }
 
     // Clerk에서 사용자 정보 가져오기
-    const client = await clerkClient();
-    const clerkUser = await client.users.getUser(userId);
+    let clerkUser;
+    try {
+      const client = await clerkClient();
+      clerkUser = await client.users.getUser(userId);
+      console.log("[API] POST /api/clients/auto-create: Clerk 사용자 정보 조회 성공", {
+        userId,
+        email: clerkUser.emailAddresses[0]?.emailAddress,
+        name: clerkUser.fullName,
+      });
+    } catch (clerkError) {
+      console.error("[API] POST /api/clients/auto-create: Clerk 사용자 정보 조회 실패", {
+        error: clerkError,
+        userId,
+      });
+      return NextResponse.json(
+        {
+          error: "Failed to fetch user information",
+          details: clerkError instanceof Error ? clerkError.message : "Unknown error",
+        },
+        { status: 500 }
+      );
+    }
 
     if (!clerkUser) {
+      console.error("[API] POST /api/clients/auto-create: Clerk 사용자 없음", { userId });
       return NextResponse.json(
         { error: "User not found" },
         { status: 404 }
@@ -61,6 +107,9 @@ export async function POST(request: Request) {
     }
 
     // 이미 클라이언트 레코드가 있는지 확인
+    console.log("[API] POST /api/clients/auto-create: 기존 클라이언트 레코드 확인 시작", {
+      userId,
+    });
     const { data: existingClient, error: checkError } = await supabase
       .from("clients")
       .select("id")
@@ -69,11 +118,31 @@ export async function POST(request: Request) {
 
     if (checkError && checkError.code !== "PGRST116") {
       // PGRST116은 "not found" 에러이므로 무시
-      console.error("[API] Error checking existing client:", checkError);
+      console.error("[API] POST /api/clients/auto-create: 기존 클라이언트 확인 실패", {
+        error: checkError,
+        errorCode: checkError.code,
+        errorMessage: checkError.message,
+        userId,
+      });
       return NextResponse.json(
-        { error: "Failed to check existing client", details: checkError.message },
+        {
+          error: "Failed to check existing client",
+          details: checkError.message,
+          code: checkError.code,
+        },
         { status: 500 }
       );
+    }
+
+    if (existingClient) {
+      console.log("[API] POST /api/clients/auto-create: 기존 클라이언트 레코드 발견", {
+        clientId: existingClient.id,
+        userId,
+      });
+    } else {
+      console.log("[API] POST /api/clients/auto-create: 기존 클라이언트 레코드 없음", {
+        userId,
+      });
     }
 
     // 초대 토큰 또는 코드가 있으면 검증 및 에이전트 정보 가져오기
@@ -214,49 +283,73 @@ export async function POST(request: Request) {
                  clerkUser.username ||
                  "Unknown";
 
-    console.log("[API] Creating new client record:", {
+    console.log("[API] POST /api/clients/auto-create: 새 클라이언트 레코드 생성 시작", {
       userId,
       name,
       email,
-      ownerAgentId,
-      invitationToken: usedInvitationToken,
-      invitationCode,
+      ownerAgentId: ownerAgentId || null,
+      invitationToken: usedInvitationToken || null,
+      invitationCode: invitationCode || null,
+    });
+
+    // owner_agent_id가 null일 수 있으므로 조건부로 포함
+    const insertData: any = {
+      clerk_user_id: userId,
+      invitation_token: usedInvitationToken,
+      access_level: "invited", // 초대받은 상태
+      name: name,
+      email: email || null, // email이 빈 문자열이면 null로 설정
+      phone_kr: null,
+      phone_us: null,
+      occupation: null, // 나중에 클라이언트가 입력
+      moving_date: null, // 나중에 클라이언트가 입력
+      relocation_type: null, // 나중에 클라이언트가 입력
+      birth_date: null,
+    };
+
+    // owner_agent_id가 있으면 포함 (null이면 제외하여 데이터베이스 제약 조건 회피)
+    if (ownerAgentId) {
+      insertData.owner_agent_id = ownerAgentId;
+    }
+
+    console.log("[API] POST /api/clients/auto-create: 삽입할 데이터", {
+      ...insertData,
+      clerk_user_id: userId, // 로그에는 포함하되 민감 정보는 마스킹
     });
 
     const { data: newClient, error: createError } = await supabase
       .from("clients")
-      .insert({
-        clerk_user_id: userId,
-        owner_agent_id: ownerAgentId,
-        invitation_token: usedInvitationToken,
-        access_level: "invited", // 초대받은 상태
-        name: name,
-        email: email,
-        phone_kr: null,
-        phone_us: null,
-        occupation: null, // 나중에 클라이언트가 입력
-        moving_date: null, // 나중에 클라이언트가 입력
-        relocation_type: null, // 나중에 클라이언트가 입력
-        birth_date: null,
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (createError) {
-      console.error("[API] Client creation error:", {
+      console.error("[API] POST /api/clients/auto-create: 클라이언트 레코드 생성 실패", {
         userId,
         error: createError,
         errorCode: createError?.code,
         errorMessage: createError?.message,
+        errorDetails: createError?.details,
+        insertData: {
+          ...insertData,
+          clerk_user_id: userId, // 로그용
+        },
       });
       return NextResponse.json(
         {
           error: "Failed to create client record",
           details: createError.message,
+          code: createError.code,
         },
         { status: 500 }
       );
     }
+
+    console.log("[API] POST /api/clients/auto-create: 클라이언트 레코드 생성 성공", {
+      clientId: newClient?.id,
+      userId,
+      ownerAgentId: ownerAgentId || null,
+    });
 
     // 초대 토큰 또는 코드를 사용된 것으로 표시
     if (usedInvitationToken) {
@@ -284,10 +377,11 @@ export async function POST(request: Request) {
       client: newClient,
     });
   } catch (error) {
-    console.error("[API] Error in POST /api/clients/auto-create:", {
+    console.error("[API] POST /api/clients/auto-create: 예상치 못한 에러 발생", {
       error,
       errorMessage: error instanceof Error ? error.message : "Unknown error",
       errorStack: error instanceof Error ? error.stack : undefined,
+      errorName: error instanceof Error ? error.name : undefined,
     });
     return NextResponse.json(
       {

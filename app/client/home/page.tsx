@@ -53,16 +53,81 @@ export default function ClientHomePage() {
 
     // 클라이언트이거나 권한 부여된 사용자인지 확인
     if (role === "client") {
-      // 클라이언트인 경우 바로 데이터 로드
-      loadProfileData();
-      loadHousingData();
-      loadChecklistData();
+      // 클라이언트인 경우 클라이언트 레코드 확인 및 생성 후 데이터 로드
+      ensureClientRecordAndLoad();
     } else {
       // role이 없거나 다른 경우 권한 부여 상태 확인
       checkAuthorizationAndLoad();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, user, authLoaded, userLoaded, router]);
+
+  // 클라이언트 레코드 확인 및 생성 후 데이터 로드
+  const ensureClientRecordAndLoad = async () => {
+    try {
+      console.log("[ClientHomePage] 클라이언트 레코드 확인 시작");
+      
+      // 먼저 클라이언트 레코드가 있는지 확인
+      const statusResponse = await fetch("/api/client/authorize/status");
+      
+      if (statusResponse.status === 404) {
+        // 클라이언트 레코드가 없으면 자동 생성 시도
+        console.log("[ClientHomePage] 클라이언트 레코드 없음, 자동 생성 시도");
+        
+        const createResponse = await fetch("/api/clients/auto-create", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({}),
+        });
+
+        if (!createResponse.ok) {
+          let errorData: any = {};
+          try {
+            errorData = await createResponse.json();
+          } catch (jsonError) {
+            console.error("[ClientHomePage] 에러 응답 파싱 실패:", jsonError);
+            errorData = {
+              error: `HTTP ${createResponse.status} 에러`,
+              details: "서버에서 에러 응답을 받았지만 파싱할 수 없습니다.",
+            };
+          }
+          
+          console.error("[ClientHomePage] 클라이언트 레코드 생성 실패:", {
+            status: createResponse.status,
+            statusText: createResponse.statusText,
+            errorData,
+          });
+          
+          const errorMessage = errorData.details || errorData.error || "알 수 없는 오류가 발생했습니다.";
+          toast({
+            title: "오류",
+            description: `클라이언트 레코드를 생성할 수 없습니다: ${errorMessage}`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        console.log("[ClientHomePage] 클라이언트 레코드 생성 성공");
+      } else if (!statusResponse.ok) {
+        console.error("[ClientHomePage] 클라이언트 상태 확인 실패:", statusResponse.status);
+        return;
+      }
+
+      // 클라이언트 레코드가 확인되었으므로 데이터 로드
+      loadProfileData();
+      loadHousingData();
+      loadChecklistData();
+    } catch (error) {
+      console.error("[ClientHomePage] 클라이언트 레코드 확인 중 오류:", error);
+      toast({
+        title: "오류",
+        description: "클라이언트 정보를 확인하는 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // 권한 부여 상태 확인 및 데이터 로드
   const checkAuthorizationAndLoad = async () => {
@@ -109,6 +174,76 @@ export default function ClientHomePage() {
 
       const response = await fetch("/api/client/profile");
       if (!response.ok) {
+        if (response.status === 401) {
+          // 클라이언트 레코드가 없을 수 있으므로 자동 생성 시도
+          console.log("[ClientHomePage] 401 에러 - 클라이언트 레코드 자동 생성 시도");
+          const createResponse = await fetch("/api/clients/auto-create", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({}),
+          });
+
+          if (createResponse.ok) {
+            console.log("[ClientHomePage] 클라이언트 레코드 생성 성공, 재시도");
+            // 재시도
+            const retryResponse = await fetch("/api/client/profile");
+            if (retryResponse.ok) {
+              const data = await retryResponse.json();
+              // 성공 처리 로직은 아래로 계속
+              const client = data.client;
+              const familyMembers = data.familyMembers || [];
+              const emergencyContacts = data.emergencyContacts || [];
+
+              setAccessLevel(client.access_level || "invited");
+
+              setClientData({
+                name: client.name || "",
+                movingDate: client.moving_date || "",
+                checklistCompletion: clientData.checklistCompletion,
+              });
+
+              const transformedFamilyMembers = familyMembers.map((member: any) => ({
+                id: member.id,
+                name: member.name,
+                relationship: member.relationship,
+                birthDate: member.birth_date ? new Date(member.birth_date) : undefined,
+                phone: member.phone || "",
+                email: member.email || "",
+                notes: member.notes || "",
+              }));
+
+              const transformedEmergencyContacts = emergencyContacts.map(
+                (contact: any) => ({
+                  id: contact.id,
+                  name: contact.name,
+                  relationship: contact.relationship,
+                  phoneKr: contact.phone_kr || "",
+                  email: contact.email || "",
+                  kakaoId: contact.kakao_id || "",
+                }),
+              );
+
+              setProfileData({
+                name: client.name || "",
+                email: client.email || "",
+                phone: client.phone_kr || client.phone_us || "",
+                occupation: client.occupation || "",
+                movingDate: client.moving_date
+                  ? new Date(client.moving_date)
+                  : undefined,
+                relocationType: client.relocation_type || "",
+                movingType: client.moving_type || "",
+                birthDate: client.birth_date ? new Date(client.birth_date) : undefined,
+                familyMembers: transformedFamilyMembers,
+                emergencyContacts: transformedEmergencyContacts,
+              });
+              setIsLoading(false);
+              return;
+            }
+          }
+        }
         if (response.status === 404) {
           console.log(
             "[ClientHomePage] 클라이언트가 없음 - 초대링크 없이 가입한 유저로 간주",
@@ -191,6 +326,70 @@ export default function ClientHomePage() {
 
       const response = await fetch("/api/client/housing");
       if (!response.ok) {
+        if (response.status === 401) {
+          // 클라이언트 레코드가 없을 수 있으므로 자동 생성 시도
+          console.log("[ClientHomePage] 401 에러 - 클라이언트 레코드 자동 생성 시도");
+          const createResponse = await fetch("/api/clients/auto-create", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({}),
+          });
+
+          if (createResponse.ok) {
+            console.log("[ClientHomePage] 클라이언트 레코드 생성 성공, 재시도");
+            // 재시도
+            const retryResponse = await fetch("/api/client/housing");
+            if (retryResponse.ok) {
+              const { housing } = await retryResponse.json();
+              if (housing) {
+                // DB 필드명 → UI 필드명 변환
+                let housingTypeArray: string[] = [];
+                if (housing.housing_type) {
+                  if (Array.isArray(housing.housing_type)) {
+                    housingTypeArray = housing.housing_type;
+                  } else {
+                    housingTypeArray = [housing.housing_type];
+                  }
+                }
+
+                let parkingCountStr = "";
+                if (
+                  housing.parking_count !== null &&
+                  housing.parking_count !== undefined
+                ) {
+                  if (housing.parking_count >= 4) {
+                    parkingCountStr = "4+";
+                  } else {
+                    parkingCountStr = housing.parking_count.toString();
+                  }
+                }
+
+                setHousingData({
+                  preferredArea: housing.preferred_city || "",
+                  maxBudget: housing.budget_max?.toString() || "",
+                  housingType: housingTypeArray,
+                  bedrooms: housing.bedrooms?.toString() || "2",
+                  bathrooms: housing.bathrooms?.toString() || "2",
+                  furnished: housing.furnished ?? false,
+                  hasWasherDryer: housing.has_washer_dryer ?? false,
+                  parking: housing.parking ?? false,
+                  parkingCount: parkingCountStr,
+                  hasPets: housing.has_pets ?? false,
+                  petDetails: housing.pet_details || "",
+                  schoolDistrict: housing.school_district ?? false,
+                  workplaceAddress: housing.workplace_address || "",
+                  additionalNotes: housing.additional_notes || "",
+                });
+              } else {
+                setHousingData(null);
+              }
+              setIsLoadingHousing(false);
+              return;
+            }
+          }
+        }
         if (response.status === 404) {
           console.log(
             "[ClientHomePage] 클라이언트가 없음 - 초대링크 없이 가입한 유저로 간주",
@@ -268,15 +467,43 @@ export default function ClientHomePage() {
 
       const response = await fetch("/api/client/checklist");
       if (!response.ok) {
-        if (response.status === 404) {
+        if (response.status === 401) {
+          // 클라이언트 레코드가 없을 수 있으므로 자동 생성 시도
+          console.log("[ClientHomePage] 401 에러 - 클라이언트 레코드 자동 생성 시도");
+          const createResponse = await fetch("/api/clients/auto-create", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({}),
+          });
+
+          if (createResponse.ok) {
+            console.log("[ClientHomePage] 클라이언트 레코드 생성 성공, 재시도");
+            // 재시도 - 성공하면 아래 로직으로 계속 진행
+            const retryResponse = await fetch("/api/client/checklist");
+            if (retryResponse.ok) {
+              // 성공 처리 로직은 아래로 계속
+            } else {
+              setChecklistData([]);
+              setIsLoadingChecklist(false);
+              return;
+            }
+          } else {
+            setChecklistData([]);
+            setIsLoadingChecklist(false);
+            return;
+          }
+        } else if (response.status === 404) {
           console.log(
             "[ClientHomePage] 클라이언트가 없음 - 초대링크 없이 가입한 유저로 간주",
           );
           setChecklistData([]);
           setIsLoadingChecklist(false);
           return;
+        } else {
+          throw new Error("Failed to load checklist data");
         }
-        throw new Error("Failed to load checklist data");
       }
 
       const { checklist } = await response.json();

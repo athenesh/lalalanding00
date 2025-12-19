@@ -101,6 +101,64 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
         const response = await fetch(url);
 
         if (!response.ok) {
+          if (response.status === 401) {
+            // 클라이언트 레코드가 없을 수 있으므로 자동 생성 시도
+            console.log("[ChatTab] 401 에러 - 클라이언트 레코드 자동 생성 시도");
+            const createResponse = await fetch("/api/clients/auto-create", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({}),
+            });
+
+            if (createResponse.ok) {
+              console.log("[ChatTab] 클라이언트 레코드 생성 성공, 재시도");
+              // 재시도
+              const retryResponse = await fetch(url);
+              if (retryResponse.ok) {
+                // 성공 처리 로직은 아래로 계속
+                const data = await retryResponse.json();
+                const loadedMessages = data.messages || [];
+                const loadedListings = data.listings || [];
+
+                // 데이터 변경 확인
+                const messagesDataStr = JSON.stringify(loadedMessages);
+                const listingsDataStr = JSON.stringify(loadedListings);
+
+                if (
+                  hasDataChanged(
+                    prevMessagesDataRef.current,
+                    messagesDataStr,
+                  ) ||
+                  hasDataChanged(prevListingsDataRef.current, listingsDataStr)
+                ) {
+                  setMessages(loadedMessages);
+                  setListings(loadedListings);
+                  prevMessagesDataRef.current = messagesDataStr;
+                  prevListingsDataRef.current = listingsDataStr;
+                }
+
+                if (isInitial) {
+                  setIsLoading(false);
+                  isInitialLoadRef.current = false;
+                }
+                return;
+              }
+            }
+            // 자동 생성 실패 시 조용히 처리
+            console.warn("[ChatTab] 클라이언트 레코드 자동 생성 실패");
+            setMessages([]);
+            setListings([]);
+            prevMessagesDataRef.current = "[]";
+            prevListingsDataRef.current = "[]";
+            if (isInitial) {
+              setIsLoading(false);
+              isInitialLoadRef.current = false;
+            }
+            return;
+          }
+
           if (response.status === 404) {
             // 채팅방이 없으면 빈 목록 반환
             setMessages([]);
