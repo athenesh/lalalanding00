@@ -105,20 +105,31 @@ export default clerkMiddleware(
       }
 
       if (maintenanceMode) {
-        // 🔥 관리자는 maintenance mode에서도 접근 가능
-        // 🔥 /admin 경로는 관리자 전용이므로 maintenance mode 예외 처리
-        // (실제 권한 체크는 layout.tsx의 requireAdmin()에서 수행)
-        if (isAdminUser || pathname.startsWith("/admin")) {
-          if (isAdminUser) {
-            console.log(
-              "[Middleware] Maintenance mode active, but admin access allowed",
-            );
-          } else if (pathname.startsWith("/admin")) {
-            console.log(
-              "[Middleware] Maintenance mode active, but /admin path allowed (will check in layout)",
-            );
-          }
-          // 관리자 또는 /admin 경로는 maintenance mode를 우회하고 정상 진행
+        // 🔥 /admin 경로는 항상 maintenance mode 예외 처리 (최우선)
+        // 관리자 전용 경로이므로 maintenance mode에서도 접근 가능
+        // 실제 권한 체크는 layout.tsx의 requireAdmin()에서 수행
+        if (pathname.startsWith("/admin")) {
+          console.log(
+            `[Middleware] Maintenance mode active, but /admin path allowed: ${pathname} (will check in layout)`,
+            {
+              pathname,
+              isAdminUser,
+              userId,
+            },
+          );
+          // /admin 경로는 maintenance mode를 우회하고 정상 진행
+          // layout.tsx에서 requireAdmin()이 권한 체크를 수행
+        } else if (isAdminUser) {
+          // 관리자 확인된 경우 모든 경로 접근 가능
+          console.log(
+            "[Middleware] Maintenance mode active, but admin access allowed",
+            {
+              pathname,
+              isAdminUser,
+              userId,
+            },
+          );
+          // 관리자는 maintenance mode를 우회하고 정상 진행
         } else {
           // Maintenance 페이지로의 접근만 허용
           if (pathname === "/maintenance") {
@@ -136,7 +147,12 @@ export default clerkMiddleware(
           }
           // 나머지 모든 경로는 maintenance 페이지로 리다이렉트
           console.log(
-            "[Middleware] Maintenance mode active, redirecting to /maintenance",
+            `[Middleware] Maintenance mode active, redirecting ${pathname} to /maintenance`,
+            {
+              pathname,
+              isAdminUser,
+              userId,
+            },
           );
           return NextResponse.redirect(new URL("/maintenance", req.url));
         }
