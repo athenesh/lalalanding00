@@ -332,6 +332,12 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
     let isPollingActive = true;
 
     const startPolling = () => {
+      // cleanup 후 실행 방지
+      if (!isPollingActive) {
+        console.log("[ChatTab] 폴링 비활성화 상태, 시작 취소");
+        return;
+      }
+
       // 페이지가 숨겨져 있거나 오프라인일 때는 폴링 중지
       if (document.hidden || !navigator.onLine) {
         console.log("[ChatTab] 폴링 일시 중지:", {
@@ -355,7 +361,13 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
           : CHAT_CONFIG.POLLING_INTERVAL;
 
       intervalId = setInterval(async () => {
-        if (!isPollingActive) return;
+        if (!isPollingActive) {
+          if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+          }
+          return;
+        }
 
         try {
           await loadMessages(false);
@@ -363,7 +375,10 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
           if (retryCount > 0) {
             console.log("[ChatTab] 폴링 복구 성공, 정상 간격으로 복귀");
             retryCount = 0;
-            startPolling(); // 정상 간격으로 재시작
+            // ⚠️ 수정: 재귀 호출 대신 interval만 재설정
+            // startPolling()을 호출하면 무한 루프가 발생할 수 있음
+            // 대신 retryCount만 리셋하고 다음 interval에서 자동으로 정상 간격 사용
+            // interval은 이미 실행 중이므로 재시작할 필요 없음
           }
         } catch (error) {
           retryCount++;
@@ -386,6 +401,7 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
             }
 
             setTimeout(() => {
+              if (!isPollingActive) return; // cleanup 후 실행 방지
               retryCount = 0; // 재시도 카운터 리셋
               startPolling(); // 폴링 재시작
             }, backoffInterval);
@@ -410,7 +426,9 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
     // 초기 로드
     loadMessages(true).then(() => {
       // 초기 로드 성공 후 폴링 시작
-      startPolling();
+      if (isPollingActive) {
+        startPolling();
+      }
     });
 
     // 페이지 가시성 변경 감지
@@ -424,8 +442,9 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
         }
       } else {
         // 포그라운드로 돌아올 때 즉시 새로고침 후 폴링 재시작
-        if (!intervalId) {
+        if (!intervalId && isPollingActive) {
           loadMessages(true).then(() => {
+            if (!isPollingActive) return; // cleanup 후 실행 방지
             retryCount = 0; // 재시도 카운터 리셋
             startPolling();
             console.log("[ChatTab] 페이지 표시, 폴링 재시작");
@@ -436,8 +455,9 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
 
     // 온라인/오프라인 상태 변경 감지
     const handleOnline = () => {
-      if (!intervalId && !document.hidden) {
+      if (!intervalId && !document.hidden && isPollingActive) {
         loadMessages(true).then(() => {
+          if (!isPollingActive) return; // cleanup 후 실행 방지
           retryCount = 0;
           startPolling();
           console.log("[ChatTab] 온라인 상태 복구, 폴링 재시작");

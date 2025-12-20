@@ -93,6 +93,15 @@ export default function HomeClient() {
         // 관리자가 아니면 role 기반 리다이렉트 진행
         if (!isAdmin) {
           // role이 있는 경우
+          if (role === "client") {
+            // 클라이언트인 경우 즉시 리다이렉트
+            hasRedirected.current = true;
+            console.log("[HomePage] 클라이언트 감지, /client/home으로 즉시 리다이렉트");
+            window.location.href = "/client/home";
+            isCheckingAuthorization.current = false;
+            return;
+          }
+          
           if (role === "agent") {
             hasRedirected.current = true;
             
