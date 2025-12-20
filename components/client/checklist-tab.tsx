@@ -30,8 +30,12 @@ interface ChecklistTabProps {
   movingDate?: string; // 클라이언트의 이주 날짜
   // 추가: Supabase 연동용 props (optional)
   initialData?: ChecklistItem[]; // API에서 받은 데이터
-  onSave?: (items: ChecklistItem[]) => Promise<void>; // 저장 핸들러
+  onSave?: (
+    items: ChecklistItem[],
+    options?: { showToast?: boolean },
+  ) => Promise<void>; // 저장 핸들러 (옵션으로 토스트 표시 여부 제어)
   isLoading?: boolean; // 로딩 상태
+  onRefresh?: () => Promise<void>; // 데이터 새로고침 콜백 (파일 업로드 후 사용)
 }
 
 // ChecklistRow 컴포넌트 - 개별 체크리스트 항목
@@ -41,6 +45,7 @@ const ChecklistRow = ({
   onToggle,
   onExpand,
   isExpanded,
+  onRefresh,
 }: {
   item: ChecklistItem;
   onUpdateItem: (
@@ -51,6 +56,7 @@ const ChecklistRow = ({
   onToggle: (id: string) => void;
   onExpand: (id: string) => void;
   isExpanded: boolean;
+  onRefresh?: () => Promise<void>;
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const memoDebounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -60,10 +66,16 @@ const ChecklistRow = ({
     if (!e.target.files || !e.target.files[0]) return;
 
     const file = e.target.files[0];
-    const itemId = item.id || item.templateId;
+    const templateId = item.templateId;
+    let itemId = item.id;
 
-    if (!itemId) {
-      console.error("[checklist-tab] 체크리스트 항목 ID가 없습니다.");
+    if (!templateId) {
+      console.error("[checklist-tab] 템플릿 ID가 없습니다.");
+      toast({
+        title: "업로드 실패",
+        description: "체크리스트 항목 정보가 없습니다.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -78,7 +90,7 @@ const ChecklistRow = ({
 
     // 낙관적 업데이트: 즉시 UI에 표시 (저장하지 않음)
     onUpdateItem(
-      itemId,
+      templateId,
       {
         files: [...item.files, tempFile],
       },
@@ -90,14 +102,102 @@ const ChecklistRow = ({
         fileName: file.name,
         fileSize: file.size,
         itemId,
+        templateId,
+        hasItemId: !!itemId,
       });
+
+      // 체크리스트 항목이 없으면 먼저 생성
+      if (!itemId) {
+        console.log("[checklist-tab] 체크리스트 항목 생성 시작:", {
+          templateId,
+        });
+
+        try {
+          // 체크리스트 항목 생성 (최소한의 데이터만)
+          const createResponse = await fetch("/api/client/checklist", {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              items: [
+                {
+                  templateId: templateId,
+                  is_completed: false,
+                  notes: null,
+                  completed_at: null,
+                },
+              ],
+            }),
+          });
+
+          if (!createResponse.ok) {
+            const error = await createResponse.json();
+            console.error("[checklist-tab] 체크리스트 항목 생성 실패:", error);
+            throw new Error(
+              error.error || "체크리스트 항목 생성 실패",
+            );
+          }
+
+          const createResult = await createResponse.json();
+          console.log("[checklist-tab] 체크리스트 항목 생성 성공:", createResult);
+
+          // 생성된 항목의 ID 가져오기
+          const createdItem = createResult.updated?.find(
+            (u: any) => u.template_id === templateId,
+          );
+          if (createdItem?.id) {
+            itemId = createdItem.id;
+            console.log("[checklist-tab] 생성된 항목 ID:", itemId);
+
+            // 로컬 상태 업데이트 (생성된 ID 반영)
+            // templateId로 찾아서 id를 업데이트
+            onUpdateItem(
+              templateId,
+              {
+                id: itemId,
+              },
+              false,
+            );
+          } else {
+            // updated 배열이 비어있거나 찾을 수 없는 경우, count를 확인
+            if (createResult.count > 0) {
+              // 항목이 생성되었지만 응답 형식이 다를 수 있음
+              // 다시 조회해서 ID 가져오기
+              console.log("[checklist-tab] 생성된 항목을 다시 조회합니다.");
+              // 일단 templateId를 itemId로 사용하고, 파일 업로드 시 다시 확인
+              // 실제로는 체크리스트를 다시 로드해야 하지만, 일단 진행
+            } else {
+              throw new Error("생성된 항목 ID를 찾을 수 없습니다.");
+            }
+          }
+        } catch (createError) {
+          console.error("[checklist-tab] 체크리스트 항목 생성 실패:", createError);
+          throw new Error(
+            `체크리스트 항목 생성 실패: ${
+              createError instanceof Error
+                ? createError.message
+                : "알 수 없는 오류"
+            }`,
+          );
+        }
+      }
+
+      if (!itemId) {
+        throw new Error("체크리스트 항목 ID를 가져올 수 없습니다.");
+      }
 
       // FormData 생성
       const formData = new FormData();
       formData.append("file", file);
       formData.append("item_id", itemId);
 
-      // API 호출
+      console.log("[checklist-tab] 파일 업로드 API 호출:", {
+        fileName: file.name,
+        itemId,
+      });
+
+      // 파일 업로드 API 호출
       const response = await fetch("/api/client/checklist/files", {
         method: "POST",
         body: formData,
@@ -105,6 +205,10 @@ const ChecklistRow = ({
 
       if (!response.ok) {
         const error = await response.json();
+        console.error("[checklist-tab] 파일 업로드 API 에러:", {
+          status: response.status,
+          error,
+        });
         throw new Error(error.error || "파일 업로드 실패");
       }
 
@@ -122,25 +226,55 @@ const ChecklistRow = ({
         document_id: result.documentId,
       };
 
-      // 임시 파일 제거하고 실제 파일 추가 (저장하지 않음)
-      const updatedFiles = item.files
+      // 현재 항목의 파일 목록 가져오기 (임시 파일 포함)
+      // item.files는 이미 tempFile이 추가된 상태이므로, tempFile을 제거하고 uploadedFile을 추가
+      const currentFiles = item.files || [];
+      const updatedFiles = currentFiles
         .filter((f) => f.id !== tempFile.id)
         .concat(uploadedFile);
 
+      console.log("[checklist-tab] 파일 목록 업데이트:", {
+        beforeCount: currentFiles.length,
+        afterCount: updatedFiles.length,
+        tempFileId: tempFile.id,
+        uploadedFileId: uploadedFile.id,
+      });
+
+      // 생성된 itemId가 있으면 그것을 사용, 없으면 templateId 사용
+      const updateId = itemId || templateId;
       onUpdateItem(
-        itemId,
+        updateId,
         {
           files: updatedFiles,
+          ...(itemId && !item.id ? { id: itemId } : {}), // 생성된 ID가 있으면 반영
         },
         false,
       ); // shouldSave = false로 설정하여 서버 저장 방지
+
+      toast({
+        title: "업로드 완료",
+        description: "파일이 성공적으로 업로드되었습니다.",
+      });
+
+      // 파일 업로드 후 데이터 새로고침 (서버에서 최신 파일 목록 가져오기)
+      if (onRefresh) {
+        console.log("[checklist-tab] 파일 업로드 후 데이터 새로고침 시작");
+        try {
+          await onRefresh();
+          console.log("[checklist-tab] 데이터 새로고침 완료");
+        } catch (refreshError) {
+          console.error("[checklist-tab] 데이터 새로고침 실패:", refreshError);
+          // 새로고침 실패해도 업로드는 성공했으므로 계속 진행
+        }
+      }
     } catch (error) {
       console.error("[checklist-tab] 파일 업로드 실패:", error);
 
       // 에러 발생 시 임시 파일 제거
       const updatedFiles = item.files.filter((f) => f.id !== tempFile.id);
+      const updateId = itemId || templateId;
       onUpdateItem(
-        itemId,
+        updateId,
         {
           files: updatedFiles,
         },
@@ -148,11 +282,12 @@ const ChecklistRow = ({
       ); // shouldSave = false로 설정
 
       // 사용자에게 에러 알림
-      alert(
-        `파일 업로드 실패: ${
-          error instanceof Error ? error.message : "알 수 없는 오류"
-        }`,
-      );
+      toast({
+        title: "업로드 실패",
+        description:
+          error instanceof Error ? error.message : "알 수 없는 오류",
+        variant: "destructive",
+      });
     } finally {
       // Reset input
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -501,6 +636,7 @@ export default function ChecklistTab({
   initialData, // 추가
   onSave, // 추가
   isLoading = false, // 추가
+  onRefresh, // 추가
 }: ChecklistTabProps) {
   // Supabase에서 로드된 데이터 사용 (하드코딩 데이터 제거됨)
   const [checklist, setChecklist] = useState<ChecklistItem[]>(
@@ -513,6 +649,8 @@ export default function ChecklistTab({
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false); // 저장 중 상태 추가
   const [isInitialized, setIsInitialized] = useState(false); // 초기화 여부
+  // 변경된 항목 추적 (templateId 또는 id를 Set으로 저장)
+  const [changedItems, setChangedItems] = useState<Set<string>>(new Set());
 
   // initialData가 변경되면 checklist 상태 업데이트
   // 단, 저장 중이 아닐 때만 업데이트 (무한 루프 방지)
@@ -562,22 +700,45 @@ export default function ChecklistTab({
   const updateChecklistItem = async (
     id: string,
     updates: Partial<ChecklistItem>,
-    shouldSave: boolean = true, // 기본값: true (즉시 저장)
+    shouldSave: boolean = false, // 기본값: false (저장 버튼으로만 저장)
   ) => {
     const previousChecklist = [...checklist]; // 이전 상태 저장 (에러 복구용)
-    const updatedChecklist = checklist.map((item) =>
-      (item.id || item.templateId) === id ? { ...item, ...updates } : item,
-    );
+    const updatedChecklist = checklist.map((item) => {
+      if ((item.id || item.templateId) === id) {
+        // files 배열이 있으면 기존 파일과 병합
+        if (updates.files) {
+          return { ...item, ...updates, files: updates.files };
+        }
+        return { ...item, ...updates };
+      }
+      return item;
+    });
+
+    console.log("[checklist-tab] updateChecklistItem 호출:", {
+      id,
+      hasFiles: !!updates.files,
+      filesCount: updates.files?.length || 0,
+      updatedChecklistLength: updatedChecklist.length,
+      shouldSave,
+    });
 
     // 로컬 상태 즉시 업데이트 (낙관적 업데이트)
     setChecklist(updatedChecklist);
+
+    // 변경된 항목 추적 (파일 업로드/삭제와 메모는 제외)
+    // 파일은 별도 API로 처리되고, 메모는 debounce로 자동 저장되므로 제외
+    if (!updates.files && !updates.memo) {
+      setChangedItems((prev) => new Set(prev).add(id));
+      console.log("[checklist-tab] 변경된 항목 추가:", id);
+    }
 
     // Supabase 연동 모드이고 onSave가 있고 shouldSave가 true면 저장
     // 단, 이미 저장 중이면 무시 (무한 루프 방지)
     if (onSave && shouldSave && !isSaving) {
       try {
         setIsSaving(true);
-        await onSave(updatedChecklist);
+        // 메모 저장 시에는 토스트를 표시하지 않음 (showToast: false)
+        await onSave(updatedChecklist, { showToast: false });
       } catch (error) {
         console.error("[ChecklistTab] 저장 실패:", error);
         // 에러 발생 시 이전 상태로 복구
@@ -589,7 +750,7 @@ export default function ChecklistTab({
     }
   };
 
-  const toggleCheck = async (id: string) => {
+  const toggleCheck = (id: string) => {
     const item = checklist.find((i) => (i.id || i.templateId) === id);
     if (!item) return;
 
@@ -598,7 +759,37 @@ export default function ChecklistTab({
       completedAt: !item.isCompleted ? new Date() : undefined,
     };
 
-    await updateChecklistItem(id, updates);
+    // shouldSave: false로 설정하여 로컬 상태만 업데이트 (저장 버튼으로만 저장)
+    updateChecklistItem(id, updates, false);
+  };
+
+  // 저장 버튼 클릭 핸들러
+  const handleSaveChanges = async () => {
+    if (!onSave || changedItems.size === 0) {
+      console.log("[checklist-tab] 저장할 항목이 없거나 onSave가 없습니다.");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      console.log("[checklist-tab] 변경된 항목 저장 시작:", {
+        changedCount: changedItems.size,
+        changedItems: Array.from(changedItems),
+      });
+
+      // 저장 버튼 클릭 시에는 토스트를 표시함 (showToast: true)
+      await onSave(checklist, { showToast: true });
+      
+      // 저장 성공 시 변경 추적 초기화
+      setChangedItems(new Set());
+      
+      console.log("[checklist-tab] 변경된 항목 저장 완료");
+    } catch (error) {
+      console.error("[checklist-tab] 저장 실패:", error);
+      throw error;
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const toggleExpand = (id: string) => {
@@ -709,6 +900,13 @@ export default function ChecklistTab({
         </div>
       )}
 
+      {/* 변경사항 알림 */}
+      {changedItems.size > 0 && !isSaving && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700 text-center">
+          {changedItems.size}개의 변경사항이 저장되지 않았습니다.
+        </div>
+      )}
+
       {/* Phase Navigation Tabs */}
       <div className="flex justify-between items-center mb-8 px-4">
         {tabs.map((tab) => {
@@ -775,10 +973,37 @@ export default function ChecklistTab({
               onUpdateItem={updateChecklistItem}
               onExpand={toggleExpand}
               isExpanded={expandedItems.has(item.id || item.templateId)}
+              onRefresh={onRefresh}
             />
           ))
         )}
       </div>
+
+      {/* 저장 버튼 - 변경사항이 있을 때만 표시 */}
+      {changedItems.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg p-4 z-50">
+          <div className="max-w-4xl mx-auto flex items-center justify-between">
+            <div className="text-sm text-slate-600">
+              <span className="font-semibold text-amber-600">
+                {changedItems.size}개
+              </span>
+              의 변경사항이 있습니다.
+            </div>
+            <button
+              onClick={handleSaveChanges}
+              disabled={isSaving}
+              className={cn(
+                "px-6 py-2.5 rounded-lg font-semibold text-sm transition-all",
+                "bg-indigo-600 text-white hover:bg-indigo-700",
+                "disabled:bg-slate-300 disabled:cursor-not-allowed",
+                "shadow-md hover:shadow-lg",
+              )}
+            >
+              {isSaving ? "저장 중..." : "저장하기"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

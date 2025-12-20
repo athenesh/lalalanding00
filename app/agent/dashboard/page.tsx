@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
-import Header from "@/components/layout/header";
 import ClientCard from "@/components/agent/client-card";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -193,18 +192,25 @@ export default function AgentDashboard() {
 
           // 승인되지 않은 경우 완료 페이지로 리다이렉트
           if (!data.isApproved) {
-            console.log("[AgentDashboard] Agent not approved, redirecting to complete page");
+            console.log(
+              "[AgentDashboard] Agent not approved, redirecting to complete page",
+            );
             router.push("/sign-up/agent/complete");
             return;
           }
         } else {
           // 에러 발생 시 완료 페이지로 리다이렉트 (정보 미입력 가능성)
-          console.log("[AgentDashboard] Failed to check approval status, redirecting to complete page");
+          console.log(
+            "[AgentDashboard] Failed to check approval status, redirecting to complete page",
+          );
           router.push("/sign-up/agent/complete");
           return;
         }
       } catch (error) {
-        console.error("[AgentDashboard] Error checking approval status:", error);
+        console.error(
+          "[AgentDashboard] Error checking approval status:",
+          error,
+        );
         router.push("/sign-up/agent/complete");
       } finally {
         setIsCheckingApproval(false);
@@ -241,7 +247,15 @@ export default function AgentDashboard() {
         loadUnassignedClients();
       }
     }
-  }, [user, userLoaded, router, toast, loadClients, loadUnassignedClients, isApproved]);
+  }, [
+    user,
+    userLoaded,
+    router,
+    toast,
+    loadClients,
+    loadUnassignedClients,
+    isApproved,
+  ]);
 
   // 클라이언트 할당 핸들러
   const handleAssignClient = async (clientId: string) => {
@@ -321,7 +335,8 @@ export default function AgentDashboard() {
 
       toast({
         title: "초대 링크 생성 완료",
-        description: "초대 링크와 코드가 생성되었습니다. 클라이언트에게 공유하세요.",
+        description:
+          "초대 링크와 코드가 생성되었습니다. 클라이언트에게 공유하세요.",
       });
     } catch (error) {
       console.error("[AgentDashboard] Error creating invitation:", error);
@@ -338,21 +353,237 @@ export default function AgentDashboard() {
     }
   };
 
-  // 초대 링크 복사 핸들러
-  const handleCopyInvitationLink = async () => {
+  // 클립보드 복사 유틸리티 함수 (fallback 포함)
+  const copyToClipboard = async (text: string): Promise<boolean> => {
+    console.log("[AgentDashboard] copyToClipboard 호출:", {
+      text,
+      textLength: text?.length,
+      textPreview: text?.substring(0, 50),
+    });
+
+    if (!text || text.trim() === "") {
+      console.error("[AgentDashboard] 복사할 텍스트가 비어있습니다.");
+      return false;
+    }
+
+    // 복사할 텍스트를 변수에 저장 (클로저 문제 방지)
+    const textToCopy = String(text).trim();
+
+    console.log("[AgentDashboard] 실제 복사할 텍스트:", {
+      textToCopy,
+      length: textToCopy.length,
+      preview: textToCopy.substring(0, 50),
+    });
+
+    // 방법 1: Clipboard API 우선 시도 (가장 안전하고 확실함)
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        console.log(
+          "[AgentDashboard] Clipboard API 사용 시도, 복사할 텍스트:",
+          textToCopy,
+        );
+
+        // Clipboard API는 직접 텍스트를 복사하므로 가장 안전함
+        await navigator.clipboard.writeText(textToCopy);
+
+        // 복사 성공 확인을 위해 읽어보기 (선택사항, 권한 필요)
+        try {
+          const clipboardText = await navigator.clipboard.readText();
+          console.log("[AgentDashboard] Clipboard API 복사 성공, 검증:", {
+            복사한_텍스트: textToCopy,
+            클립보드_내용: clipboardText,
+            일치여부: clipboardText === textToCopy,
+          });
+        } catch (readError) {
+          // 읽기 권한이 없어도 복사는 성공했을 수 있음
+          console.log(
+            "[AgentDashboard] Clipboard API 복사 완료 (검증 불가, 읽기 권한 없음)",
+          );
+        }
+
+        return true;
+      } catch (clipboardError) {
+        console.warn(
+          "[AgentDashboard] Clipboard API 실패, fallback 사용:",
+          clipboardError,
+        );
+        // Clipboard API 실패 시 fallback으로 진행
+      }
+    }
+
+    // 방법 2: Fallback - document.execCommand 사용
+    console.log(
+      "[AgentDashboard] Clipboard API 없음/실패, fallback 사용, 복사할 텍스트:",
+      textToCopy,
+    );
+
+    // 모든 기존 선택 및 포커스 제거 (중요!)
+    const activeElement = document.activeElement as HTMLElement;
+    if (activeElement && activeElement !== document.body) {
+      if (activeElement.blur) {
+        activeElement.blur();
+      }
+    }
+
+    // 모든 선택 제거 (여러 번 시도)
+    for (let i = 0; i < 3; i++) {
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+      }
+      if (document.getSelection) {
+        const docSelection = document.getSelection();
+        if (docSelection) {
+          docSelection.removeAllRanges();
+        }
+      }
+    }
+
+    // textarea 생성 및 설정
+    const textArea = document.createElement("textarea");
+    textArea.value = textToCopy;
+    // 화면 밖에 배치하되, 스크린 리더와 접근성 도구를 위해 숨김 처리
+    textArea.style.position = "fixed";
+    textArea.style.left = "0";
+    textArea.style.top = "0";
+    textArea.style.width = "2em";
+    textArea.style.height = "2em";
+    textArea.style.padding = "0";
+    textArea.style.border = "none";
+    textArea.style.outline = "none";
+    textArea.style.boxShadow = "none";
+    textArea.style.background = "transparent";
+    textArea.style.opacity = "0";
+    textArea.style.pointerEvents = "none";
+    textArea.setAttribute("readonly", "");
+    textArea.setAttribute("aria-hidden", "true");
+    textArea.setAttribute("tabindex", "-1");
+
+    document.body.appendChild(textArea);
+
+    // DOM에 완전히 추가되도록 대기
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
     try {
-      await navigator.clipboard.writeText(generatedInvitationLink);
-      toast({
-        title: "복사 완료",
-        description: "초대 링크가 클립보드에 복사되었습니다.",
+      // 모든 선택을 다시 한 번 제거
+      const allSelections = window.getSelection();
+      if (allSelections) {
+        allSelections.removeAllRanges();
+      }
+      if (document.getSelection) {
+        const docSel = document.getSelection();
+        if (docSel) {
+          docSel.removeAllRanges();
+        }
+      }
+
+      // textarea에 포커스하고 선택
+      textArea.focus();
+      textArea.select();
+
+      // iOS Safari를 위한 추가 처리
+      if (navigator.userAgent.match(/ipad|iphone/i)) {
+        const range = document.createRange();
+        range.selectNodeContents(textArea);
+        const sel = window.getSelection();
+        if (sel) {
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+        textArea.setSelectionRange(0, textToCopy.length);
+      } else {
+        // setSelectionRange로 확실하게 선택 범위 설정
+        textArea.setSelectionRange(0, textToCopy.length);
+      }
+
+      // 선택이 확실히 되도록 대기
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // 선택 범위 확인
+      const selectedText = textArea.value.substring(
+        textArea.selectionStart || 0,
+        textArea.selectionEnd || 0,
+      );
+
+      console.log("[AgentDashboard] 복사 전 선택 확인:", {
+        textAreaValue: textArea.value,
+        textToCopy: textToCopy,
+        selectedText: selectedText,
+        selectionStart: textArea.selectionStart,
+        selectionEnd: textArea.selectionEnd,
+        valuesMatch: textArea.value === textToCopy,
+        selectedMatch: selectedText === textToCopy,
       });
-    } catch (error) {
-      console.error("[AgentDashboard] Error copying link:", error);
-      toast({
-        title: "복사 실패",
-        description: "링크 복사에 실패했습니다.",
-        variant: "destructive",
+
+      // 선택이 제대로 되지 않았으면 다시 시도
+      if (selectedText !== textToCopy) {
+        console.warn("[AgentDashboard] 선택이 제대로 되지 않음, 다시 시도");
+        textArea.focus();
+        textArea.select();
+        textArea.setSelectionRange(0, textToCopy.length);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+
+      // 복사 실행
+      const successful = document.execCommand("copy");
+
+      console.log("[AgentDashboard] execCommand 복사 결과:", successful, {
+        textAreaValue: textArea.value,
+        textToCopy: textToCopy,
+        selectedText: textArea.value.substring(
+          textArea.selectionStart || 0,
+          textArea.selectionEnd || 0,
+        ),
+        valuesMatch: textArea.value === textToCopy,
       });
+
+      // 복사 후 즉시 정리
+      textArea.blur();
+
+      // 모든 선택 제거
+      for (let i = 0; i < 3; i++) {
+        const finalSelection = window.getSelection();
+        if (finalSelection) {
+          finalSelection.removeAllRanges();
+        }
+        if (document.getSelection) {
+          const finalDocSelection = document.getSelection();
+          if (finalDocSelection) {
+            finalDocSelection.removeAllRanges();
+          }
+        }
+      }
+
+      // textarea 제거
+      if (document.body.contains(textArea)) {
+        document.body.removeChild(textArea);
+      }
+
+      // 포커스를 안전한 곳으로 이동
+      if (document.body) {
+        document.body.focus();
+      }
+
+      return successful;
+    } catch (err) {
+      console.error("[AgentDashboard] execCommand 복사 실패:", err);
+
+      // 에러 발생 시 정리
+      textArea.blur();
+      const errorSelection = window.getSelection();
+      if (errorSelection) {
+        errorSelection.removeAllRanges();
+      }
+      if (document.getSelection) {
+        const errorDocSelection = document.getSelection();
+        if (errorDocSelection) {
+          errorDocSelection.removeAllRanges();
+        }
+      }
+      if (document.body.contains(textArea)) {
+        document.body.removeChild(textArea);
+      }
+      return false;
     }
   };
 
@@ -382,9 +613,15 @@ export default function AgentDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header title="내 클라이언트 관리" userName={displayName} />
-
       <main className="container mx-auto px-4 py-8">
+        {/* 페이지 제목 */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">내 클라이언트 관리</h1>
+          <p className="text-muted-foreground mt-2">
+            총 {clients.length}명의 클라이언트를 관리하고 있습니다
+          </p>
+        </div>
+
         {/* 초대 링크 생성 섹션 */}
         <div className="mb-8 flex justify-between items-center">
           <div>
@@ -393,7 +630,10 @@ export default function AgentDashboard() {
               새로운 클라이언트를 초대하여 서비스를 이용하도록 할 수 있습니다
             </p>
           </div>
-          <Dialog open={isInvitationDialogOpen} onOpenChange={setIsInvitationDialogOpen}>
+          <Dialog
+            open={isInvitationDialogOpen}
+            onOpenChange={setIsInvitationDialogOpen}
+          >
             <DialogTrigger asChild>
               <Button>
                 <LinkIcon className="mr-2 h-4 w-4" />
@@ -412,9 +652,7 @@ export default function AgentDashboard() {
                 {!generatedInvitationLink ? (
                   <>
                     <div className="space-y-2">
-                      <Label htmlFor="email">
-                        이메일 (선택사항)
-                      </Label>
+                      <Label htmlFor="email">이메일 (선택사항)</Label>
                       <Input
                         id="email"
                         type="email"
@@ -432,9 +670,7 @@ export default function AgentDashboard() {
                       disabled={isCreatingInvitation}
                       className="w-full"
                     >
-                      {isCreatingInvitation
-                        ? "생성 중..."
-                        : "초대 링크 생성"}
+                      {isCreatingInvitation ? "생성 중..." : "초대 링크 생성"}
                     </Button>
                   </>
                 ) : (
@@ -442,59 +678,106 @@ export default function AgentDashboard() {
                     <div className="space-y-4">
                       <div className="space-y-2">
                         <Label>생성된 초대 링크</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            value={generatedInvitationLink}
-                            readOnly
-                            className="font-mono text-sm"
-                          />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={handleCopyInvitationLink}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <Input
+                          value={generatedInvitationLink}
+                          readOnly
+                          className="font-mono text-sm cursor-pointer"
+                          onClick={async (e) => {
+                            // Input 필드 클릭 시 자동 복사
+                            e.preventDefault();
+                            e.stopPropagation();
+
+                            const linkToCopy = generatedInvitationLink;
+
+                            if (!linkToCopy || linkToCopy.trim() === "") {
+                              toast({
+                                title: "복사 실패",
+                                description: "복사할 링크가 없습니다.",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+
+                            // 텍스트 선택
+                            e.currentTarget.select();
+
+                            // 클립보드에 복사
+                            const success = await copyToClipboard(linkToCopy);
+                            if (success) {
+                              toast({
+                                title: "복사 완료",
+                                description:
+                                  "초대 링크가 클립보드에 복사되었습니다.",
+                              });
+                            } else {
+                              toast({
+                                title: "복사 실패",
+                                description:
+                                  "링크 복사에 실패했습니다. 링크를 직접 선택하여 복사해주세요.",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                          onFocus={(e) => {
+                            // 포커스 시 텍스트 선택
+                            e.target.select();
+                          }}
+                        />
                         <p className="text-sm text-muted-foreground">
-                          링크를 복사하여 클라이언트에게 공유하세요.
+                          링크를 클릭하면 자동으로 복사됩니다.
                         </p>
                       </div>
 
                       {generatedInvitationCode && (
                         <div className="space-y-2">
                           <Label>초대 코드</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              value={generatedInvitationCode}
-                              readOnly
-                              className="font-mono text-sm text-center text-lg font-bold"
-                            />
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={async () => {
-                                try {
-                                  await navigator.clipboard.writeText(generatedInvitationCode);
-                                  toast({
-                                    title: "복사 완료",
-                                    description: "초대 코드가 클립보드에 복사되었습니다.",
-                                  });
-                                } catch (error) {
-                                  console.error("[AgentDashboard] Error copying code:", error);
-                                  toast({
-                                    title: "복사 실패",
-                                    description: "코드 복사에 실패했습니다.",
-                                    variant: "destructive",
-                                  });
-                                }
-                              }}
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          <Input
+                            value={generatedInvitationCode}
+                            readOnly
+                            className="font-mono text-sm text-center text-lg font-bold cursor-pointer"
+                            onClick={async (e) => {
+                              // Input 필드 클릭 시 자동 복사
+                              e.preventDefault();
+                              e.stopPropagation();
+
+                              const codeToCopy = generatedInvitationCode;
+
+                              if (!codeToCopy || codeToCopy.trim() === "") {
+                                toast({
+                                  title: "복사 실패",
+                                  description: "복사할 코드가 없습니다.",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+
+                              // 텍스트 선택
+                              e.currentTarget.select();
+
+                              // 클립보드에 복사
+                              const success = await copyToClipboard(codeToCopy);
+                              if (success) {
+                                toast({
+                                  title: "복사 완료",
+                                  description:
+                                    "초대 코드가 클립보드에 복사되었습니다.",
+                                });
+                              } else {
+                                toast({
+                                  title: "복사 실패",
+                                  description:
+                                    "코드 복사에 실패했습니다. 코드를 직접 선택하여 복사해주세요.",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                            onFocus={(e) => {
+                              // 포커스 시 텍스트 선택
+                              e.target.select();
+                            }}
+                          />
                           <p className="text-sm text-muted-foreground">
-                            초대 코드를 클라이언트에게 공유하세요. 코드는 더 간편하게 사용할 수 있습니다.
+                            코드를 클릭하면 자동으로 복사됩니다.
                           </p>
                         </div>
                       )}

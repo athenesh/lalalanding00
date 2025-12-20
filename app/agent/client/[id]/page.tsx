@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import Header from "@/components/layout/header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1025,7 +1024,6 @@ export default function AgentClientDetailPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header title="클라이언트 상세" userName="에이전트" />
         <main className="container mx-auto px-4 py-8">
           <div className="flex items-center justify-center min-h-[400px]">
             <p className="text-muted-foreground">로딩 중...</p>
@@ -1039,7 +1037,6 @@ export default function AgentClientDetailPage() {
   if (!clientProfile) {
     return (
       <div className="min-h-screen bg-background">
-        <Header title="클라이언트 상세" userName="에이전트" />
         <main className="container mx-auto px-4 py-8">
           <div className="flex items-center justify-center min-h-[400px]">
             <p className="text-muted-foreground">
@@ -1053,8 +1050,6 @@ export default function AgentClientDetailPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header title="클라이언트 상세" userName="에이전트" />
-
       <main className="container mx-auto px-4 py-8">
         <Button
           variant="ghost"

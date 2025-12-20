@@ -326,6 +326,12 @@ export async function PATCH(request: Request) {
 
     // 비상연락망 업데이트
     if (emergency_contacts && Array.isArray(emergency_contacts)) {
+      console.log("[API] 비상연락망 업데이트 시작:", {
+        clientId: existingClient.id,
+        count: emergency_contacts.length,
+        contacts: emergency_contacts,
+      });
+
       // 기존 비상연락망 삭제
       const { error: deleteEmergencyError } = await supabase
         .from("emergency_contacts")
@@ -337,34 +343,58 @@ export async function PATCH(request: Request) {
           "[API] Failed to delete emergency contacts:",
           deleteEmergencyError,
         );
-      } else {
-        // 새 비상연락망 추가
-        if (emergency_contacts.length > 0) {
-          const emergencyData = emergency_contacts.map((contact: any) => ({
+        return NextResponse.json(
+          {
+            error: "Failed to update emergency contacts",
+            details: deleteEmergencyError.message,
+          },
+          { status: 500 },
+        );
+      }
+
+      // 새 비상연락망 추가
+      if (emergency_contacts.length > 0) {
+        const emergencyData = emergency_contacts.map((contact: any) => {
+          console.log("[API] 비상연락망 데이터 변환:", {
+            original: contact,
+            phone_kr: contact.phone_kr,
+            kakao_id: contact.kakao_id,
+          });
+          return {
             client_id: existingClient.id,
             name: contact.name,
             relationship: contact.relationship,
-            phone_kr: contact.phoneKr || null,
+            phone_kr: contact.phone_kr || null,
             email: contact.email || null,
-            kakao_id: contact.kakaoId || null,
-          }));
+            kakao_id: contact.kakao_id || null,
+          };
+        });
 
-          const { error: insertEmergencyError } = await supabase
-            .from("emergency_contacts")
-            .insert(emergencyData);
+        console.log("[API] 비상연락망 삽입 데이터:", emergencyData);
 
-          if (insertEmergencyError) {
-            console.error(
-              "[API] Failed to insert emergency contacts:",
-              insertEmergencyError,
-            );
-          } else {
-            console.log("[API] Emergency contacts updated:", {
-              clientId: existingClient.id,
-              count: emergency_contacts.length,
-            });
-          }
+        const { error: insertEmergencyError } = await supabase
+          .from("emergency_contacts")
+          .insert(emergencyData);
+
+        if (insertEmergencyError) {
+          console.error(
+            "[API] Failed to insert emergency contacts:",
+            insertEmergencyError,
+          );
+          return NextResponse.json(
+            {
+              error: "Failed to insert emergency contacts",
+              details: insertEmergencyError.message,
+              code: insertEmergencyError.code,
+            },
+            { status: 500 },
+          );
         }
+
+        console.log("[API] Emergency contacts updated:", {
+          clientId: existingClient.id,
+          count: emergency_contacts.length,
+        });
       }
     }
 

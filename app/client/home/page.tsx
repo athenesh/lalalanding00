@@ -3,11 +3,10 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, useUser } from "@clerk/nextjs";
-import Header from "@/components/layout/header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Calendar, Lock } from "lucide-react";
+import { Calendar, Lock, UserPlus } from "lucide-react";
 import ProfileTab from "@/components/client/profile-tab";
 import HousingTab from "@/components/client/housing-tab";
 import ChecklistTab from "@/components/client/checklist-tab";
@@ -15,6 +14,8 @@ import ChatTab from "@/components/client/chat-tab";
 import { useToast } from "@/hooks/use-toast";
 import { TimelinePhase } from "@/types/checklist";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export default function ClientHomePage() {
   const { userId, isLoaded: authLoaded } = useAuth();
@@ -31,10 +32,24 @@ export default function ClientHomePage() {
   const [housingData, setHousingData] = useState<any>(null);
   const [checklistData, setChecklistData] = useState<any[]>([]);
   const [accessLevel, setAccessLevel] = useState<"invited" | "paid">("invited");
+  const [tabAccess, setTabAccess] = useState({
+    canAccessHousing: false,
+    canAccessChecklist: false,
+    isDevelopment: false,
+    agentApproved: false,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingHousing, setIsLoadingHousing] = useState(false);
   const [isLoadingChecklist, setIsLoadingChecklist] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [ownerAgentId, setOwnerAgentId] = useState<string | null>(null);
+  const [agentCode, setAgentCode] = useState("");
+  const [isSubmittingCode, setIsSubmittingCode] = useState(false);
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+  const [verifiedAgent, setVerifiedAgent] = useState<{
+    name: string | null;
+    email: string | null;
+  } | null>(null);
 
   // 클라이언트 역할 체크 및 프로필 데이터 로드
   useEffect(() => {
@@ -66,14 +81,14 @@ export default function ClientHomePage() {
   const ensureClientRecordAndLoad = async () => {
     try {
       console.log("[ClientHomePage] 클라이언트 레코드 확인 시작");
-      
+
       // 먼저 클라이언트 레코드가 있는지 확인
       const statusResponse = await fetch("/api/client/authorize/status");
-      
+
       if (statusResponse.status === 404) {
         // 클라이언트 레코드가 없으면 자동 생성 시도
         console.log("[ClientHomePage] 클라이언트 레코드 없음, 자동 생성 시도");
-        
+
         const createResponse = await fetch("/api/clients/auto-create", {
           method: "POST",
           headers: {
@@ -93,14 +108,17 @@ export default function ClientHomePage() {
               details: "서버에서 에러 응답을 받았지만 파싱할 수 없습니다.",
             };
           }
-          
+
           console.error("[ClientHomePage] 클라이언트 레코드 생성 실패:", {
             status: createResponse.status,
             statusText: createResponse.statusText,
             errorData,
           });
-          
-          const errorMessage = errorData.details || errorData.error || "알 수 없는 오류가 발생했습니다.";
+
+          const errorMessage =
+            errorData.details ||
+            errorData.error ||
+            "알 수 없는 오류가 발생했습니다.";
           toast({
             title: "오류",
             description: `클라이언트 레코드를 생성할 수 없습니다: ${errorMessage}`,
@@ -111,7 +129,10 @@ export default function ClientHomePage() {
 
         console.log("[ClientHomePage] 클라이언트 레코드 생성 성공");
       } else if (!statusResponse.ok) {
-        console.error("[ClientHomePage] 클라이언트 상태 확인 실패:", statusResponse.status);
+        console.error(
+          "[ClientHomePage] 클라이언트 상태 확인 실패:",
+          statusResponse.status,
+        );
         return;
       }
 
@@ -119,6 +140,8 @@ export default function ClientHomePage() {
       loadProfileData();
       loadHousingData();
       loadChecklistData();
+      // 탭 접근 권한 확인
+      checkTabAccess();
     } catch (error) {
       console.error("[ClientHomePage] 클라이언트 레코드 확인 중 오류:", error);
       toast({
@@ -126,6 +149,34 @@ export default function ClientHomePage() {
         description: "클라이언트 정보를 확인하는 중 오류가 발생했습니다.",
         variant: "destructive",
       });
+    }
+  };
+
+  // 탭 접근 권한 확인
+  const checkTabAccess = async () => {
+    try {
+      console.log("[ClientHomePage] 탭 접근 권한 확인 시작");
+      const response = await fetch("/api/client/access-status");
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log("[ClientHomePage] 탭 접근 권한 확인 결과:", data);
+        setTabAccess({
+          canAccessHousing: data.canAccessHousing || false,
+          canAccessChecklist: data.canAccessChecklist || false,
+          isDevelopment: data.isDevelopment || false,
+          agentApproved: data.agentApproved || false,
+        });
+      } else {
+        console.error(
+          "[ClientHomePage] 탭 접근 권한 확인 실패:",
+          response.status,
+        );
+        // 실패 시 기본값 유지 (모두 false)
+      }
+    } catch (error) {
+      console.error("[ClientHomePage] 탭 접근 권한 확인 중 오류:", error);
+      // 에러 시 기본값 유지 (모두 false)
     }
   };
 
@@ -145,6 +196,8 @@ export default function ClientHomePage() {
           loadProfileData();
           loadHousingData();
           loadChecklistData();
+          // 탭 접근 권한 확인
+          checkTabAccess();
         } else {
           console.log(
             "[ClientHomePage] 권한 부여 상태 없음, 홈으로 리다이렉트",
@@ -176,7 +229,9 @@ export default function ClientHomePage() {
       if (!response.ok) {
         if (response.status === 401) {
           // 클라이언트 레코드가 없을 수 있으므로 자동 생성 시도
-          console.log("[ClientHomePage] 401 에러 - 클라이언트 레코드 자동 생성 시도");
+          console.log(
+            "[ClientHomePage] 401 에러 - 클라이언트 레코드 자동 생성 시도",
+          );
           const createResponse = await fetch("/api/clients/auto-create", {
             method: "POST",
             headers: {
@@ -197,6 +252,7 @@ export default function ClientHomePage() {
               const emergencyContacts = data.emergencyContacts || [];
 
               setAccessLevel(client.access_level || "invited");
+              setOwnerAgentId(client.owner_agent_id || null);
 
               setClientData({
                 name: client.name || "",
@@ -204,15 +260,19 @@ export default function ClientHomePage() {
                 checklistCompletion: clientData.checklistCompletion,
               });
 
-              const transformedFamilyMembers = familyMembers.map((member: any) => ({
-                id: member.id,
-                name: member.name,
-                relationship: member.relationship,
-                birthDate: member.birth_date ? new Date(member.birth_date) : undefined,
-                phone: member.phone || "",
-                email: member.email || "",
-                notes: member.notes || "",
-              }));
+              const transformedFamilyMembers = familyMembers.map(
+                (member: any) => ({
+                  id: member.id,
+                  name: member.name,
+                  relationship: member.relationship,
+                  birthDate: member.birth_date
+                    ? new Date(member.birth_date)
+                    : undefined,
+                  phone: member.phone || "",
+                  email: member.email || "",
+                  notes: member.notes || "",
+                }),
+              );
 
               const transformedEmergencyContacts = emergencyContacts.map(
                 (contact: any) => ({
@@ -235,10 +295,13 @@ export default function ClientHomePage() {
                   : undefined,
                 relocationType: client.relocation_type || "",
                 movingType: client.moving_type || "",
-                birthDate: client.birth_date ? new Date(client.birth_date) : undefined,
+                birthDate: client.birth_date
+                  ? new Date(client.birth_date)
+                  : undefined,
                 familyMembers: transformedFamilyMembers,
                 emergencyContacts: transformedEmergencyContacts,
               });
+              setOwnerAgentId(client.owner_agent_id || null);
               setIsLoading(false);
               return;
             }
@@ -265,6 +328,9 @@ export default function ClientHomePage() {
 
       // access_level 설정
       setAccessLevel(client.access_level || "invited");
+
+      // owner_agent_id 설정
+      setOwnerAgentId(client.owner_agent_id || null);
 
       // 클라이언트 데이터 설정
       // 체크리스트 완료율은 loadChecklistData에서 계산
@@ -310,6 +376,9 @@ export default function ClientHomePage() {
         familyMembers: transformedFamilyMembers,
         emergencyContacts: transformedEmergencyContacts,
       });
+
+      // owner_agent_id도 설정
+      setOwnerAgentId(client.owner_agent_id || null);
     } catch (error) {
       console.error("[ClientHomePage] 프로필 데이터 로드 실패:", error);
       // 에러 토스트는 표시하지 않음 (초대링크 없이 가입한 유저는 정상적인 상황)
@@ -328,7 +397,9 @@ export default function ClientHomePage() {
       if (!response.ok) {
         if (response.status === 401) {
           // 클라이언트 레코드가 없을 수 있으므로 자동 생성 시도
-          console.log("[ClientHomePage] 401 에러 - 클라이언트 레코드 자동 생성 시도");
+          console.log(
+            "[ClientHomePage] 401 에러 - 클라이언트 레코드 자동 생성 시도",
+          );
           const createResponse = await fetch("/api/clients/auto-create", {
             method: "POST",
             headers: {
@@ -469,7 +540,9 @@ export default function ClientHomePage() {
       if (!response.ok) {
         if (response.status === 401) {
           // 클라이언트 레코드가 없을 수 있으므로 자동 생성 시도
-          console.log("[ClientHomePage] 401 에러 - 클라이언트 레코드 자동 생성 시도");
+          console.log(
+            "[ClientHomePage] 401 에러 - 클라이언트 레코드 자동 생성 시도",
+          );
           const createResponse = await fetch("/api/clients/auto-create", {
             method: "POST",
             headers: {
@@ -558,11 +631,16 @@ export default function ClientHomePage() {
     }
   };
 
-  const handleSaveChecklist = async (items: any[]) => {
+  const handleSaveChecklist = async (
+    items: any[],
+    options?: { showToast?: boolean },
+  ) => {
+    const showToast = options?.showToast ?? true; // 기본값: true (하위 호환성)
     try {
       setIsSaving(true);
       console.log("[ClientHomePage] 체크리스트 저장 시작:", {
         itemCount: items.length,
+        showToast,
       });
 
       // 저장할 때 전송한 메모를 저장해두고, 서버 응답과 비교하여 동기화
@@ -686,10 +764,13 @@ export default function ClientHomePage() {
         updatedCount: updated.length,
       });
 
-      toast({
-        title: "저장 완료",
-        description: "체크리스트가 성공적으로 저장되었습니다.",
-      });
+      // showToast가 true일 때만 토스트 표시
+      if (showToast) {
+        toast({
+          title: "저장 완료",
+          description: "체크리스트가 성공적으로 저장되었습니다.",
+        });
+      }
     } catch (error) {
       console.error("[ClientHomePage] 체크리스트 저장 오류:", error);
       toast({
@@ -836,15 +917,28 @@ export default function ClientHomePage() {
 
       // 비상연락망이 있으면 추가
       if (data.emergencyContacts && data.emergencyContacts.length > 0) {
+        console.log("[ClientHomePage] 비상연락망 데이터 변환 전:", {
+          emergencyContacts: data.emergencyContacts,
+        });
         requestBody.emergency_contacts = data.emergencyContacts.map(
-          (contact: any) => ({
-            name: contact.name,
-            relationship: contact.relationship,
-            phone_kr: contact.phoneKr || null,
-            email: contact.email || null,
-            kakao_id: contact.kakaoId || null,
-          }),
+          (contact: any) => {
+            const mapped = {
+              name: contact.name,
+              relationship: contact.relationship,
+              phone_kr: contact.phoneKr || null,
+              email: contact.email || null,
+              kakao_id: contact.kakaoId || null,
+            };
+            console.log("[ClientHomePage] 비상연락망 데이터 변환:", {
+              original: contact,
+              mapped,
+            });
+            return mapped;
+          },
         );
+        console.log("[ClientHomePage] 비상연락망 최종 데이터:", {
+          emergency_contacts: requestBody.emergency_contacts,
+        });
       }
 
       const response = await fetch("/api/client/profile", {
@@ -914,6 +1008,128 @@ export default function ClientHomePage() {
     }
   };
 
+  // 에이전트 코드 검증 핸들러
+  const handleVerifyCode = async (code: string) => {
+    if (code.length !== 6) {
+      return;
+    }
+
+    try {
+      setIsVerifyingCode(true);
+      console.log("[ClientHomePage] 에이전트 코드 검증 시작:", code);
+
+      const response = await fetch(
+        `/api/invitations/verify-code?code=${code.toUpperCase()}`,
+      );
+
+      const data = await response.json();
+
+      if (data.valid) {
+        setVerifiedAgent({
+          name: data.invitation.agentName,
+          email: data.invitation.agentEmail,
+        });
+        console.log(
+          "[ClientHomePage] 에이전트 코드 검증 성공:",
+          data.invitation,
+        );
+      } else {
+        setVerifiedAgent(null);
+        toast({
+          title: "코드 검증 실패",
+          description: data.error || "유효하지 않은 초대 코드입니다.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("[ClientHomePage] 에이전트 코드 검증 오류:", error);
+      setVerifiedAgent(null);
+      toast({
+        title: "코드 검증 실패",
+        description: "코드를 확인하는 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifyingCode(false);
+    }
+  };
+
+  // 에이전트 코드 입력 핸들러
+  const handleAgentCodeChange = (value: string) => {
+    // 대문자로 변환하고 6자리만 허용
+    const upperValue = value.toUpperCase().slice(0, 6);
+    setAgentCode(upperValue);
+    setVerifiedAgent(null);
+
+    // 6자리가 되면 자동 검증
+    if (upperValue.length === 6) {
+      handleVerifyCode(upperValue);
+    }
+  };
+
+  // 에이전트 배정 요청 핸들러
+  const handleAssignAgent = async () => {
+    if (!agentCode || agentCode.length !== 6) {
+      toast({
+        title: "코드 입력 필요",
+        description: "6자리 에이전트 코드를 입력해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSubmittingCode(true);
+      console.log("[ClientHomePage] 에이전트 배정 요청 시작:", agentCode);
+
+      const response = await fetch("/api/clients/assign-by-code", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code: agentCode }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "에이전트 배정에 실패했습니다.");
+      }
+
+      const data = await response.json();
+
+      console.log("[ClientHomePage] 에이전트 배정 성공:", data);
+
+      toast({
+        title: "배정 완료",
+        description: data.agent
+          ? `${data.agent.name || "에이전트"}님이 성공적으로 배정되었습니다.`
+          : "에이전트가 성공적으로 배정되었습니다.",
+      });
+
+      // 상태 초기화
+      setAgentCode("");
+      setVerifiedAgent(null);
+
+      // 프로필 데이터 다시 로드하여 owner_agent_id 업데이트
+      console.log("[ClientHomePage] 에이전트 배정 후 데이터 갱신 시작");
+      await loadProfileData();
+      await checkTabAccess();
+      console.log("[ClientHomePage] 에이전트 배정 후 데이터 갱신 완료");
+    } catch (error) {
+      console.error("[ClientHomePage] 에이전트 배정 오류:", error);
+      toast({
+        title: "배정 실패",
+        description:
+          error instanceof Error
+            ? error.message
+            : "에이전트 배정에 실패했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingCode(false);
+    }
+  };
+
   const daysUntilMoving = clientData.movingDate
     ? Math.ceil(
         (new Date(clientData.movingDate).getTime() - new Date().getTime()) /
@@ -923,9 +1139,15 @@ export default function ClientHomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header title="내 이주 준비" userName={clientData.name} />
-
       <main className="container mx-auto px-4 py-8">
+        {/* 페이지 제목 */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold">내 이주 준비</h1>
+          <p className="text-muted-foreground mt-2">
+            {clientData.name}님의 이주 준비 현황
+          </p>
+        </div>
+
         <div className="space-y-6">
           <Card className="w-full">
             <CardContent className="p-6 pt-6">
@@ -977,24 +1199,91 @@ export default function ClientHomePage() {
             </CardContent>
           </Card>
 
+          {/* 에이전트 배정 요청 알림 (에이전트가 배정되지 않은 경우) */}
+          {!ownerAgentId && !isLoading && (
+            <Alert className="border-primary/50 bg-primary/5">
+              <UserPlus className="h-4 w-4 text-primary" />
+              <AlertTitle>에이전트 배정이 필요합니다</AlertTitle>
+              <AlertDescription className="space-y-4">
+                <p>
+                  에이전트가 배정되어야 주거옵션 및 체크리스트 기능을 이용하실
+                  수 있습니다.
+                </p>
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      placeholder="에이전트 코드 입력 (6자리)"
+                      value={agentCode}
+                      onChange={(e) => handleAgentCodeChange(e.target.value)}
+                      maxLength={6}
+                      className="uppercase font-mono"
+                      disabled={isSubmittingCode || isVerifyingCode}
+                    />
+                    <Button
+                      onClick={handleAssignAgent}
+                      disabled={
+                        !agentCode ||
+                        agentCode.length !== 6 ||
+                        isSubmittingCode ||
+                        isVerifyingCode ||
+                        !verifiedAgent
+                      }
+                    >
+                      {isSubmittingCode ? "처리 중..." : "배정 요청"}
+                    </Button>
+                  </div>
+                  {isVerifyingCode && (
+                    <p className="text-sm text-muted-foreground">
+                      코드를 확인하는 중...
+                    </p>
+                  )}
+                  {verifiedAgent && (
+                    <div className="rounded-md bg-primary/10 p-3 text-sm">
+                      <p className="font-medium text-primary">
+                        {verifiedAgent.name || "에이전트"}
+                        {verifiedAgent.email && ` (${verifiedAgent.email})`}님의
+                        코드가 확인되었습니다.
+                      </p>
+                      <p className="mt-1 text-muted-foreground">
+                        배정 요청 버튼을 클릭하여 에이전트를 배정하세요.
+                      </p>
+                    </div>
+                  )}
+                  {agentCode.length === 6 &&
+                    !verifiedAgent &&
+                    !isVerifyingCode && (
+                      <p className="text-sm text-destructive">
+                        유효하지 않은 코드입니다. 다시 확인해주세요.
+                      </p>
+                    )}
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
           <Tabs defaultValue="profile" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="profile">내 프로필</TabsTrigger>
               <TabsTrigger
                 value="housing"
-                disabled={accessLevel === "invited"}
-                className={accessLevel === "invited" ? "opacity-50" : ""}
+                disabled={!tabAccess.canAccessHousing}
+                className={!tabAccess.canAccessHousing ? "opacity-50" : ""}
               >
                 주거옵션
-                {accessLevel === "invited" && <Lock className="ml-1 h-3 w-3" />}
+                {!tabAccess.canAccessHousing && (
+                  <Lock className="ml-1 h-3 w-3" />
+                )}
               </TabsTrigger>
               <TabsTrigger
                 value="checklist"
-                disabled={accessLevel === "invited"}
-                className={accessLevel === "invited" ? "opacity-50" : ""}
+                disabled={!tabAccess.canAccessChecklist}
+                className={!tabAccess.canAccessChecklist ? "opacity-50" : ""}
               >
                 체크리스트
-                {accessLevel === "invited" && <Lock className="ml-1 h-3 w-3" />}
+                {!tabAccess.canAccessChecklist && (
+                  <Lock className="ml-1 h-3 w-3" />
+                )}
               </TabsTrigger>
               <TabsTrigger value="chat">채팅</TabsTrigger>
             </TabsList>
@@ -1017,13 +1306,18 @@ export default function ClientHomePage() {
               </TabsContent>
 
               <TabsContent value="housing" className="space-y-6">
-                {accessLevel === "invited" ? (
+                {!tabAccess.canAccessHousing ? (
                   <Alert>
                     <Lock className="h-4 w-4" />
-                    <AlertTitle>초대링크가 필요합니다</AlertTitle>
+                    <AlertTitle>
+                      {tabAccess.isDevelopment
+                        ? "개발 중인 기능입니다"
+                        : "에이전트 승인이 필요합니다"}
+                    </AlertTitle>
                     <AlertDescription>
-                      주거옵션 기능을 이용하시려면 에이전트의 초대링크를 통해
-                      가입해주세요.
+                      {tabAccess.isDevelopment
+                        ? "이 기능은 현재 개발 중입니다. 곧 이용하실 수 있습니다."
+                        : "주거옵션 기능을 이용하시려면 에이전트가 승인되어야 합니다."}
                     </AlertDescription>
                   </Alert>
                 ) : (
@@ -1046,13 +1340,18 @@ export default function ClientHomePage() {
               </TabsContent>
 
               <TabsContent value="checklist" className="space-y-6">
-                {accessLevel === "invited" ? (
+                {!tabAccess.canAccessChecklist ? (
                   <Alert>
                     <Lock className="h-4 w-4" />
-                    <AlertTitle>초대링크가 필요합니다</AlertTitle>
+                    <AlertTitle>
+                      {tabAccess.isDevelopment
+                        ? "개발 중인 기능입니다"
+                        : "에이전트 승인이 필요합니다"}
+                    </AlertTitle>
                     <AlertDescription>
-                      체크리스트 기능을 이용하시려면 에이전트의 초대링크를 통해
-                      가입해주세요.
+                      {tabAccess.isDevelopment
+                        ? "이 기능은 현재 개발 중입니다. 곧 이용하실 수 있습니다."
+                        : "체크리스트 기능을 이용하시려면 에이전트가 승인되어야 합니다."}
                     </AlertDescription>
                   </Alert>
                 ) : (
@@ -1063,6 +1362,7 @@ export default function ClientHomePage() {
                     }
                     onSave={handleSaveChecklist}
                     isLoading={isLoadingChecklist}
+                    onRefresh={loadChecklistData}
                   />
                 )}
               </TabsContent>

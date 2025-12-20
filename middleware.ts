@@ -34,20 +34,29 @@ export default clerkMiddleware(
 
       // Maintenance mode 체크 전에 사용자 인증 정보 가져오기 (관리자 예외 처리용)
       const { userId, sessionClaims } = await auth();
-      const role = (sessionClaims?.publicMetadata as { role?: string })?.role;
-
-      // 🔥 관리자 체크 (maintenance mode 예외 처리용)
+      
+      // 🔥 role을 sessionClaims에서 먼저 시도하고, 없으면 Clerk API로 직접 조회
+      // 로그인 직후에는 sessionClaims가 업데이트되지 않을 수 있으므로 API로 직접 조회
+      let role: string | undefined = (sessionClaims?.publicMetadata as { role?: string })?.role;
+      
+      // 🔥 관리자 체크 및 role 조회 (maintenance mode 예외 처리용)
       let isAdminUser = false;
       if (userId) {
         try {
+          const client = await clerkClient();
+          const user = await client.users.getUser(userId);
+          
+          // role이 없으면 Clerk API에서 직접 조회
+          if (!role) {
+            role = user.publicMetadata?.role as string | undefined;
+          }
+          
           const adminEmail = process.env.ADMIN_EMAIL;
           if (!adminEmail) {
             console.warn(
               "[Middleware] ADMIN_EMAIL 환경 변수가 설정되지 않았습니다.",
             );
           } else {
-            const client = await clerkClient();
-            const user = await client.users.getUser(userId);
             const userEmail = user.emailAddresses[0]?.emailAddress;
 
             if (userEmail) {
@@ -190,7 +199,9 @@ export default clerkMiddleware(
           pathname.startsWith("/sign-up")
         ) {
           // 관리자가 아닌 경우에만 role 기반 리다이렉트
+          // 🔥 클라이언트는 즉시 리다이렉트 (페이지 렌더링 방지)
           if (!isAdminUser && role === "client") {
+            console.log("[Middleware] 클라이언트 감지, /client/home으로 즉시 리다이렉트");
             return NextResponse.redirect(new URL("/client/home", req.url));
           }
           // 관리자이거나 역할이 없으면 그대로 진행 (홈 페이지에서 관리자 체크 수행)

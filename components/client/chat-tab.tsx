@@ -31,6 +31,7 @@ import { updateListingExcluded } from "@/actions/listing-excluded";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { CHAT_CONFIG } from "@/lib/config/chat";
+import { useAuth } from "@clerk/nextjs";
 
 interface Message {
   id: string;
@@ -38,6 +39,8 @@ interface Message {
   sender_clerk_id: string;
   sender_type: "agent" | "client";
   created_at: string;
+  sender_name?: string; // 발신자 이름
+  is_spouse?: boolean; // 배우자 여부
 }
 
 interface Listing {
@@ -61,6 +64,7 @@ interface ChatTabProps {
 }
 
 export default function ChatTab({ userType, clientId }: ChatTabProps) {
+  const { userId: currentUserId, isLoaded: authLoaded } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -747,7 +751,10 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
           </div>
         ) : (
           messages.map((message) => {
-            const isOwnMessage = message.sender_type === userType;
+            const isOwnMessage =
+              authLoaded && currentUserId
+                ? message.sender_clerk_id === currentUserId
+                : message.sender_type === userType;
 
             return (
               <div key={message.id} className="space-y-2">
@@ -766,12 +773,27 @@ export default function ChatTab({ userType, clientId }: ChatTabProps) {
                         : "max-w-fit",
                     )}
                   >
+                    {/* 발신자 이름 표시 (자신의 메시지가 아닌 경우) */}
+                    {!isOwnMessage && message.sender_name && (
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-semibold text-foreground">
+                          {message.sender_name}
+                        </span>
+                        {message.is_spouse && (
+                          <span className="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded text-xs font-medium">
+                            배우자
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div
                       className={cn(
                         "rounded-lg px-4 py-2",
                         isOwnMessage
                           ? "chat-bubble-agent"
-                          : "chat-bubble-client",
+                          : message.is_spouse
+                            ? "bg-purple-100 dark:bg-purple-900/30 text-purple-900 dark:text-purple-100"
+                            : "chat-bubble-client",
                         shouldWrapMessage(message.content)
                           ? "break-words"
                           : "whitespace-nowrap",

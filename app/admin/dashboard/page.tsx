@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
-import Header from "@/components/layout/header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -87,9 +86,12 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header title="관리자 대시보드" userName={displayName} />
-
       <main className="container mx-auto px-4 py-8">
+        {/* 페이지 제목 */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">관리자 대시보드</h1>
+        </div>
+
         {isLoading ? (
           <div className="text-center py-16">
             <p className="text-muted-foreground">통계 데이터를 불러오는 중...</p>

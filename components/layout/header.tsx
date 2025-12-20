@@ -1,30 +1,27 @@
-"use client";
-
-import { UserButton } from "@clerk/nextjs";
-
 interface HeaderProps {
   title: string;
   userName?: string;
+  description?: string;
 }
 
-export default function Header({ title, userName }: HeaderProps) {
+export default function Header({ title, userName, description }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-card">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold text-foreground">{title}</h1>
+    <div className="border-b border-border bg-muted/30">
+      <div className="container mx-auto flex h-14 items-center justify-between px-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+          {description && (
+            <p className="text-sm text-muted-foreground">{description}</p>
+          )}
         </div>
         
         {userName && (
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="font-medium">{userName}</span>
-            </div>
-            <UserButton afterSignOutUrl="/" />
+          <div className="flex items-center gap-2 text-sm">
+            <span className="font-medium text-muted-foreground">{userName}</span>
           </div>
         )}
       </div>
-    </header>
+    </div>
   );
 }
 

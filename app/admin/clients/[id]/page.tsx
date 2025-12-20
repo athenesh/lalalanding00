@@ -102,7 +102,6 @@ export default function AdminClientDetailPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header title="클라이언트 상세" userName={displayName} />
         <main className="container mx-auto px-4 py-8">
           <div className="text-center py-16">
             <p className="text-muted-foreground">클라이언트 정보를 불러오는 중...</p>
@@ -115,7 +114,6 @@ export default function AdminClientDetailPage() {
   if (!client) {
     return (
       <div className="min-h-screen bg-background">
-        <Header title="클라이언트 상세" userName={displayName} />
         <main className="container mx-auto px-4 py-8">
           <div className="text-center py-16">
             <p className="text-muted-foreground">클라이언트를 찾을 수 없습니다.</p>
@@ -132,10 +130,10 @@ export default function AdminClientDetailPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header title="클라이언트 상세" userName={displayName} />
-
       <main className="container mx-auto px-4 py-8">
+        {/* 페이지 제목 */}
         <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-4">클라이언트 상세</h1>
           <Link href="/admin/clients">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="mr-2 h-4 w-4" />

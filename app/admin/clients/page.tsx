@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
-import Header from "@/components/layout/header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,9 +93,12 @@ export default function AdminClientsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header title="클라이언트 관리" userName={displayName} />
-
       <main className="container mx-auto px-4 py-8">
+        {/* 페이지 제목 */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold">클라이언트 관리</h1>
+        </div>
+
         {/* 검색 및 필터 */}
         <div className="mb-6 flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">

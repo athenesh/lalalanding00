@@ -12,6 +12,7 @@ import {
   logPermissionDenied,
   logInvalidInput,
 } from "@/lib/logging/security-events";
+import { clerkClient } from "@clerk/nextjs/server";
 
 /**
  * POST /api/messages
@@ -507,7 +508,161 @@ export async function GET(request: Request) {
       roomId: room.id,
     });
 
-    // 리스팅 정보 조회
+    // 발신자 정보 추가 (이름, 배우자 여부)
+    if (messages && messages.length > 0) {
+      // 모든 발신자 clerk_id 수집
+      const senderClerkIds = [
+        ...new Set(messages.map((m) => m.sender_clerk_id)),
+      ];
+      const agentClerkIds = messages
+        .filter((m) => m.sender_type === "agent")
+        .map((m) => m.sender_clerk_id);
+      const clientClerkIds = messages
+        .filter((m) => m.sender_type === "client")
+        .map((m) => m.sender_clerk_id);
+
+      // 에이전트 이름 배치 조회
+      const accountsMap = new Map<string, string>();
+      if (agentClerkIds.length > 0) {
+        const { data: accounts } = await supabase
+          .from("accounts")
+          .select("clerk_user_id, name")
+          .in("clerk_user_id", agentClerkIds);
+
+        accounts?.forEach((account) => {
+          if (account.clerk_user_id && account.name) {
+            accountsMap.set(account.clerk_user_id, account.name);
+          }
+        });
+      }
+
+      // 클라이언트 이름 배치 조회
+      const clientsMap = new Map<string, string>();
+      if (clientClerkIds.length > 0) {
+        const { data: clients } = await supabase
+          .from("clients")
+          .select("clerk_user_id, name")
+          .in("clerk_user_id", clientClerkIds);
+
+        clients?.forEach((client) => {
+          if (client.clerk_user_id && client.name) {
+            clientsMap.set(client.clerk_user_id, client.name);
+          }
+        });
+      }
+
+      // 배우자 여부 확인 (client_authorizations 테이블)
+      const spouseClerkIds = new Set<string>();
+      if (clientClerkIds.length > 0) {
+        const { data: authorizations } = await supabase
+          .from("client_authorizations")
+          .select("authorized_clerk_user_id")
+          .in("authorized_clerk_user_id", clientClerkIds);
+
+        authorizations?.forEach((auth) => {
+          if (auth.authorized_clerk_user_id) {
+            spouseClerkIds.add(auth.authorized_clerk_user_id);
+          }
+        });
+      }
+
+      // 배우자 이름은 Clerk API로 배치 조회
+      const spouseNamesMap = new Map<string, string>();
+      if (spouseClerkIds.size > 0) {
+        const clerk = await clerkClient();
+        await Promise.all(
+          Array.from(spouseClerkIds).map(async (clerkId) => {
+            try {
+              const clerkUser = await clerk.users.getUser(clerkId);
+              const name =
+                clerkUser.fullName ||
+                [clerkUser.firstName, clerkUser.lastName]
+                  .filter(Boolean)
+                  .join(" ") ||
+                clerkUser.username ||
+                "배우자";
+              spouseNamesMap.set(clerkId, name);
+            } catch (error) {
+              console.error("[API] 배우자 이름 조회 실패:", {
+                clerkId,
+                error,
+              });
+              spouseNamesMap.set(clerkId, "배우자");
+            }
+          })
+        );
+      }
+
+      // 메시지에 발신자 정보 추가
+      const messagesWithSender = messages.map((message) => {
+        let senderName = "";
+        let isSpouse = false;
+
+        if (message.sender_type === "agent") {
+          senderName = accountsMap.get(message.sender_clerk_id) || "에이전트";
+        } else if (message.sender_type === "client") {
+          const clientName = clientsMap.get(message.sender_clerk_id);
+          if (clientName) {
+            // clients 테이블에 있으면 실제 클라이언트
+            senderName = clientName;
+          } else if (spouseClerkIds.has(message.sender_clerk_id)) {
+            // client_authorizations에 있으면 배우자
+            isSpouse = true;
+            senderName =
+              spouseNamesMap.get(message.sender_clerk_id) || "배우자";
+          } else {
+            // 둘 다 없으면 기본값 (예외 상황)
+            senderName = "클라이언트";
+          }
+        }
+
+        return {
+          ...message,
+          sender_name: senderName,
+          is_spouse: isSpouse,
+        };
+      });
+
+      console.log("[API] 발신자 정보 추가 완료:", {
+        messageCount: messagesWithSender.length,
+        spouseCount: messagesWithSender.filter((m) => m.is_spouse).length,
+      });
+
+      // 리스팅 정보 조회
+      const { data: listings, error: listingsError } = await supabase
+        .from("shared_listings")
+        .select(
+          "id, listing_url, address, price, bedrooms, bathrooms, square_feet, title, thumbnail_url, notes, created_at, is_excluded",
+        ) // is_excluded 추가
+        .eq("room_id", room.id)
+        .order("created_at", { ascending: false });
+
+      if (listingsError) {
+        console.error("[API] 리스팅 조회 실패:", {
+          error: listingsError,
+          roomId: room.id,
+        });
+      } else {
+        console.log("[API] 리스팅 조회 성공:", {
+          listingCount: listings?.length || 0,
+          roomId: room.id,
+        });
+      }
+
+      // 전체 메시지 수 조회
+      const { count } = await supabase
+        .from("chat_messages")
+        .select("*", { count: "exact", head: true })
+        .eq("room_id", room.id);
+
+      return NextResponse.json({
+        messages: messagesWithSender || [],
+        listings: listings || [],
+        total: count || 0,
+      });
+    }
+
+    // 메시지가 없는 경우
     const { data: listings, error: listingsError } = await supabase
       .from("shared_listings")
       .select(
@@ -535,10 +690,11 @@ export async function GET(request: Request) {
       .eq("room_id", room.id);
 
     return NextResponse.json({
-      messages: messages || [],
+      messages: [],
       listings: listings || [],
       total: count || 0,
     });
+
   } catch (error) {
     console.error("[API] Error in GET /api/messages:", error);
     return NextResponse.json(

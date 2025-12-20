@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
-import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -118,14 +117,11 @@ export default function AdminAgentsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header
-        title="에이전트 관리"
-        userName={
-          user?.fullName || user?.emailAddresses[0]?.emailAddress || "Admin"
-        }
-      />
-
       <main className="container mx-auto px-4 py-8">
+        {/* 페이지 제목 */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold">에이전트 관리</h1>
+        </div>
         <div className="mb-6 flex gap-2">
           <Button
             variant={filter === "all" ? "default" : "outline"}

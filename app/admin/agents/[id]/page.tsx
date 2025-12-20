@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
-import Header from "@/components/layout/header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -96,7 +95,6 @@ export default function AdminAgentDetailPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header title="에이전트 상세" userName={displayName} />
         <main className="container mx-auto px-4 py-8">
           <div className="text-center py-16">
             <p className="text-muted-foreground">에이전트 정보를 불러오는 중...</p>
@@ -109,7 +107,6 @@ export default function AdminAgentDetailPage() {
   if (!agent) {
     return (
       <div className="min-h-screen bg-background">
-        <Header title="에이전트 상세" userName={displayName} />
         <main className="container mx-auto px-4 py-8">
           <div className="text-center py-16">
             <p className="text-muted-foreground">에이전트를 찾을 수 없습니다.</p>
@@ -126,10 +123,10 @@ export default function AdminAgentDetailPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header title="에이전트 상세" userName={displayName} />
-
       <main className="container mx-auto px-4 py-8">
+        {/* 페이지 제목 */}
         <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-4">에이전트 상세</h1>
           <Link href="/admin/agents">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="mr-2 h-4 w-4" />
